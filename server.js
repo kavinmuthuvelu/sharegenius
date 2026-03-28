@@ -1655,6 +1655,7 @@ function updatePositionsBadge() {
 // ─────────────────────────────────────────────
 //  STOCK UNIVERSE
 // ─────────────────────────────────────────────
+// ── Nifty 50 (current composition) ───────────────────────────────────────────
 const NIFTY50 = [
   'ADANIENT','ADANIPORTS','APOLLOHOSP','ASIANPAINT','AXISBANK',
   'BAJAJ-AUTO','BAJAJFINSV','BAJFINANCE','BHARTIARTL','BPCL',
@@ -1668,17 +1669,21 @@ const NIFTY50 = [
   'TECHM','TITAN','TRENT','ULTRACEMCO','WIPRO'
 ];
 
+// ── Nifty Next 50 — updated from Mahesh Kaushik sheet + official NSE list ────
+// UPL, GLAND, GICRE, ALKEM, SBICARD, AUROPHARMA, NMDC, INDIGO added (were missing)
 const NIFTY_NEXT50 = [
-  'ABB','ADANIGREEN','ADANIPOWER','AMBUJACEM','BAJAJHLDNG',
-  'BANKBARODA','BEL','BERGEPAINT','BOSCHLTD','CANBK',
-  'CHOLAFIN','COLPAL','DLF','GAIL','HAVELLS',
-  'INDHOTEL','IRCTC','JINDALSTEL','LTIM','LUPIN',
-  'MCDOWELL-N','NHPC','NYKAA','OBEROIRLTY','OFSS',
-  'PAGEIND','PIIND','PIDILITIND','PNB','RECLTD',
-  'SAIL','SIEMENS','SRF','TATACOMM','TATAPOWER',
-  'TORNTPHARM','TORNTPOWER','TVSMOTOR','UBL','UNIONBANK',
-  'VBL','VEDL','VOLTAS','ZOMATO','ZYDUSLIFE',
-  'GODREJCP','GODREJPROP','MFSL','OFSS','PERSISTENT'
+  'ABB','ADANIGREEN','ADANIPOWER','ALKEM','AMBUJACEM',
+  'AUROPHARMA','BAJAJHLDNG','BANKBARODA','BEL','BERGEPAINT',
+  'BOSCHLTD','CANBK','CHOLAFIN','COLPAL','DLF',
+  'GAIL','GICRE','GLAND','GODREJCP','GODREJPROP',
+  'HAVELLS','INDHOTEL','INDIGO','IRCTC','JINDALSTEL',
+  'LTIM','LUPIN','MCDOWELL-N','MFSL','NHPC',
+  'NMDC','NYKAA','OBEROIRLTY','OFSS','PAGEIND',
+  'PERSISTENT','PIIND','PIDILITIND','PNB','RECLTD',
+  'SAIL','SBICARD','SIEMENS','SRF','TATACOMM',
+  'TATAPOWER','TORNTPHARM','TORNTPOWER','TVSMOTOR','UBL',
+  'UNIONBANK','UPL','VBL','VEDL','VOLTAS',
+  'ZOMATO','ZYDUSLIFE'
 ];
 
 const STOCK_UNIVERSE = {
@@ -1783,7 +1788,12 @@ async function get20DayData(symbol) {
   const todayLow = meta.regularMarketDayLow ?? today.low;
 
   // Match: today low within 0.15% of 20-day low
-  const isAt20DayLow = Math.abs(todayLow - low20) / low20 <= 0.0015;
+  // Match: today's low within 0.05% of 20-day low.
+  // Excel uses strict equality (D=E) with Google Finance data.
+  // We allow a tiny 0.05% buffer to account for Yahoo vs Google Finance
+  // rounding differences — tight enough to avoid false positives like DIVISLAB
+  // (0.135% away) while catching genuine exact-low matches like UPL (0.00%).
+  const isAt20DayLow = Math.abs(todayLow - low20) / low20 <= 0.0005;
 
   return {
     symbol,
