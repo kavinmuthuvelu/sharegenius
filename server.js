@@ -688,6 +688,9 @@ const HTML_PAGE = `<!DOCTYPE html>
     <button class="tab-btn" onclick="switchTab('guide')" id="tab-guide">
       <span class="tab-icon">📖</span> Strategy Guide
     </button>
+    <button class="tab-btn" onclick="switchTab('backtest')" id="tab-backtest">
+      <span class="tab-icon">📊</span> Backtest
+    </button>
   </nav>
 
   <!-- ═══════ MAIN CONTENT ══════════════════════════════ -->
@@ -968,6 +971,137 @@ const HTML_PAGE = `<!DOCTYPE html>
       </div>
     </div>
 
+
+    <!-- ─── BACKTEST PANEL ───────────────────────────────── -->
+    <div class="panel" id="panel-backtest">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Backtest — Real NSE Data</div>
+          <div class="section-subtitle">DHAN API · NIFTY 50 · JAN 2021 – TODAY</div>
+        </div>
+        <div class="section-actions">
+          <button class="btn btn-primary" id="bt-run-btn" onclick="runBacktest()">
+            ▶ Run Backtest
+          </button>
+        </div>
+      </div>
+
+      <!-- Config -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px;">
+        <div class="stat-card">
+          <div class="stat-label">Dhan Client ID</div>
+          <input class="form-input" id="bt-client-id" placeholder="Your Dhan Client ID"
+            style="margin-top:6px;font-size:12px;"
+            value="" />
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Access Token</div>
+          <input class="form-input" id="bt-token" placeholder="Paste access token"
+            type="password" style="margin-top:6px;font-size:12px;" />
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Capital ₹</div>
+          <input class="form-input" id="bt-capital" value="400000" type="number"
+            style="margin-top:6px;font-size:12px;" />
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Per Trade ₹</div>
+          <input class="form-input" id="bt-trade-size" value="8000" type="number"
+            style="margin-top:6px;font-size:12px;" />
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">From Date</div>
+          <input class="form-input" id="bt-from" value="2021-01-01" type="date"
+            style="margin-top:6px;font-size:12px;" />
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">To Date</div>
+          <input class="form-input" id="bt-to" value="2026-03-27" type="date"
+            style="margin-top:6px;font-size:12px;" />
+        </div>
+      </div>
+
+      <!-- Progress -->
+      <div class="progress-wrap" id="bt-progress-wrap">
+        <div class="progress-meta">
+          <span id="bt-progress-label">Fetching data from Dhan...</span>
+          <span id="bt-progress-pct">0%</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="bt-progress-fill"></div>
+        </div>
+        <div class="scan-status" id="bt-scan-status">—</div>
+      </div>
+
+      <!-- Summary Stats -->
+      <div id="bt-summary" style="display:none;">
+        <div class="stats-row" style="margin-bottom:20px;" id="bt-stat-cards"></div>
+
+        <!-- Year-wise table -->
+        <div class="table-wrap" style="margin-bottom:20px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Year</th>
+                <th class="num">Trades</th>
+                <th class="num">Wins</th>
+                <th class="num">Losses</th>
+                <th class="num">Win Rate</th>
+                <th class="num">P&amp;L</th>
+              </tr>
+            </thead>
+            <tbody id="bt-year-tbody"></tbody>
+          </table>
+        </div>
+
+        <!-- Trade log -->
+        <div class="section-header" style="margin-bottom:12px;">
+          <div class="section-title" style="font-size:16px;">Trade Log</div>
+          <div class="section-actions">
+            <select class="form-input" id="bt-filter-sym" onchange="renderBtTrades()"
+              style="font-size:12px;padding:6px 10px;width:140px;">
+              <option value="">All symbols</option>
+            </select>
+            <select class="form-input" id="bt-filter-result" onchange="renderBtTrades()"
+              style="font-size:12px;padding:6px 10px;width:120px;">
+              <option value="">All results</option>
+              <option value="win">Wins only</option>
+              <option value="loss">Losses only</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th class="num">Entry Date</th>
+                <th class="num">Exit Date</th>
+                <th class="num">Avg Price ₹</th>
+                <th class="num">Exit Price ₹</th>
+                <th class="num">Hold Days</th>
+                <th class="num">Avg#</th>
+                <th class="num">Target %</th>
+                <th class="num">P&amp;L ₹</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody id="bt-trade-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Empty state -->
+      <div id="bt-empty" style="text-align:center;padding:60px 20px;color:var(--text3);">
+        <div style="font-size:40px;margin-bottom:12px;opacity:0.4">📊</div>
+        <div style="font-size:16px;font-weight:700;color:var(--text2);margin-bottom:6px;">Real backtest with your Dhan data</div>
+        <div style="font-size:13px;font-family:var(--mono);line-height:1.6;">
+          Enter your Dhan Client ID + Access Token and click Run.<br/>
+          We fetch daily OHLCV for all Nifty 50 stocks and simulate the strategy on actual NSE prices.
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -1124,6 +1258,170 @@ function switchTab(tab) {
   document.getElementById('tab-' + tab).classList.add('active');
   if (tab === 'watchlist') loadWatchlist();
   if (tab === 'positions') loadPositions();
+}
+
+// ═══════════════════════════════════════════════════════
+//  BACKTEST — Dhan Historical API
+// ═══════════════════════════════════════════════════════
+const state_bt = { trades: [], running: false };
+
+function runBacktest() {
+  if (state_bt.running) return;
+  const token    = document.getElementById('bt-token').value.trim();
+  const clientId = document.getElementById('bt-client-id').value.trim();
+  const capital  = parseFloat(document.getElementById('bt-capital').value) || 400000;
+  const tradeSize= parseFloat(document.getElementById('bt-trade-size').value) || 8000;
+  const fromDate = document.getElementById('bt-from').value;
+  const toDate   = document.getElementById('bt-to').value;
+
+  if (!token || !clientId) return toast('Enter Dhan Client ID and Access Token', 'error');
+
+  state_bt.running = true;
+  state_bt.trades  = [];
+  document.getElementById('bt-run-btn').innerHTML = '<span class="spinner"></span> Running...';
+  document.getElementById('bt-run-btn').disabled = true;
+  document.getElementById('bt-progress-wrap').classList.add('visible');
+  document.getElementById('bt-summary').style.display = 'none';
+  document.getElementById('bt-empty').style.display   = 'none';
+
+  const url = \`/api/backtest/run?token=\${encodeURIComponent(token)}&clientId=\${encodeURIComponent(clientId)}&capital=\${capital}&tradeSize=\${tradeSize}&fromDate=\${fromDate}&toDate=\${toDate}\`;
+  const es = new EventSource(url);
+
+  es.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+
+    if (msg.type === 'progress') {
+      const p = Math.round((msg.current / msg.total) * 100);
+      document.getElementById('bt-progress-fill').style.width = p + '%';
+      document.getElementById('bt-progress-pct').textContent = p + '%';
+      document.getElementById('bt-scan-status').textContent =
+        \`\${msg.symbol}: \${msg.status}\${msg.error ? ' — ⚠️ ' + msg.error : ''}\`;
+      document.getElementById('bt-progress-label').textContent =
+        \`Fetching [\${msg.current}/\${msg.total}] \${msg.symbol}...\`;
+      if (msg.trades) state_bt.trades.push(...msg.trades);
+    }
+
+    if (msg.type === 'complete') {
+      es.close();
+      state_bt.running = false;
+      document.getElementById('bt-run-btn').innerHTML = '▶ Run Backtest';
+      document.getElementById('bt-run-btn').disabled = false;
+      document.getElementById('bt-progress-wrap').classList.remove('visible');
+      renderBtResults(msg.summary, msg.byYear, capital);
+      toast(\`Backtest complete — \${msg.summary.closed_trades} trades on real NSE data\`, 'success');
+    }
+
+    if (msg.type === 'error') {
+      es.close();
+      state_bt.running = false;
+      document.getElementById('bt-run-btn').innerHTML = '▶ Run Backtest';
+      document.getElementById('bt-run-btn').disabled = false;
+      document.getElementById('bt-progress-wrap').classList.remove('visible');
+      toast(msg.error, 'error');
+    }
+  };
+
+  es.onerror = () => {
+    es.close();
+    state_bt.running = false;
+    document.getElementById('bt-run-btn').innerHTML = '▶ Run Backtest';
+    document.getElementById('bt-run-btn').disabled = false;
+    document.getElementById('bt-progress-wrap').classList.remove('visible');
+    toast('Backtest connection error', 'error');
+  };
+}
+
+function renderBtResults(summary, byYear, capital) {
+  document.getElementById('bt-summary').style.display = 'block';
+
+  // Stat cards
+  const totalReturn = ((summary.final_value - capital) / capital * 100).toFixed(1);
+  document.getElementById('bt-stat-cards').innerHTML = \`
+    <div class="stat-card">
+      <div class="stat-label">Final Value</div>
+      <div class="stat-value gold">\${fmtCurr(summary.final_value, 0)}</div>
+      <div class="stat-sub">Started \${fmtCurr(capital, 0)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Return</div>
+      <div class="stat-value \${summary.total_pnl >= 0 ? 'green' : 'red'}">\${totalReturn >= 0 ? '+' : ''}\${totalReturn}%</div>
+      <div class="stat-sub">CAGR \${summary.cagr}% / yr</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">P&L</div>
+      <div class="stat-value \${summary.total_pnl >= 0 ? 'green' : 'red'}">\${fmtCurr(summary.total_pnl, 0)}</div>
+      <div class="stat-sub">\${summary.closed_trades} closed trades</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Win Rate</div>
+      <div class="stat-value">\${summary.win_rate}%</div>
+      <div class="stat-sub">\${summary.win_trades}W / \${summary.loss_trades}L</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Win</div>
+      <div class="stat-value green">+\${fmtCurr(summary.avg_win, 0)}</div>
+      <div class="stat-sub">in \${summary.avg_hold_win} days</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Loss</div>
+      <div class="stat-value red">\${fmtCurr(summary.avg_loss, 0)}</div>
+      <div class="stat-sub">in \${summary.avg_hold_loss} days</div>
+    </div>\`;
+
+  // Year table
+  document.getElementById('bt-year-tbody').innerHTML = Object.entries(byYear).map(([y, v]) => \`
+    <tr>
+      <td><strong>\${y}</strong></td>
+      <td class="num">\${v.trades}</td>
+      <td class="num up">\${v.wins}</td>
+      <td class="num down">\${v.losses}</td>
+      <td class="num">\${v.win_rate}%</td>
+      <td class="num \${v.pnl >= 0 ? 'up' : 'down'}">\${v.pnl >= 0 ? '+' : ''}\${fmtCurr(v.pnl, 0)}</td>
+    </tr>\`).join('');
+
+  // Populate symbol filter
+  const syms = [...new Set(state_bt.trades.map(t => t.symbol))].sort();
+  const sel = document.getElementById('bt-filter-sym');
+  sel.innerHTML = '<option value="">All symbols</option>' +
+    syms.map(s => \`<option value="\${s}">\${s}</option>\`).join('');
+
+  renderBtTrades();
+}
+
+function renderBtTrades() {
+  const symFilter = document.getElementById('bt-filter-sym').value;
+  const resFilter = document.getElementById('bt-filter-result').value;
+
+  let trades = state_bt.trades;
+  if (symFilter) trades = trades.filter(t => t.symbol === symFilter);
+  if (resFilter === 'win')  trades = trades.filter(t => t.pnl > 0);
+  if (resFilter === 'loss') trades = trades.filter(t => t.pnl <= 0);
+  trades = trades.slice().sort((a, b) => new Date(b.entry_date) - new Date(a.entry_date));
+
+  if (!trades.length) {
+    document.getElementById('bt-trade-tbody').innerHTML =
+      '<tr class="empty-row"><td colspan="10">No trades match filter</td></tr>';
+    return;
+  }
+
+  document.getElementById('bt-trade-tbody').innerHTML = trades.map(t => \`
+    <tr class="\${t.pnl > 0 ? '' : t.exit_reason === 'OPEN' ? '' : 'alert-row'}">
+      <td><span class="sym-name">\${t.symbol}</span></td>
+      <td class="num">\${t.entry_date}</td>
+      <td class="num">\${t.exit_date}</td>
+      <td class="num">\${fmtCurr(t.entry_price)}</td>
+      <td class="num">\${fmtCurr(t.exit_price)}</td>
+      <td class="num">\${t.hold_days}d</td>
+      <td class="num">\${t.avg_count > 0 ? t.avg_count + '×' : '—'}</td>
+      <td class="num" style="color:var(--gold)">\${t.target_pct}%</td>
+      <td class="num \${t.pnl >= 0 ? 'up' : 'down'}">\${t.pnl >= 0 ? '+' : ''}\${fmtCurr(t.pnl, 0)}</td>
+      <td>
+        \${t.exit_reason === 'TARGET' ? '<span class="badge badge-hit">TARGET</span>' :
+          t.exit_reason === 'OPEN'   ? '<span class="badge badge-open">OPEN</span>'   :
+          t.exit_reason === 'TIMEOUT'? '<span class="badge badge-closed">TIMEOUT</span>' :
+                                        '<span class="badge badge-closed">EXIT</span>'}
+      </td>
+    </tr>\`).join('');
 }
 
 function openModal(id) { document.getElementById(id).classList.add('open'); }
@@ -2037,6 +2335,260 @@ app.delete('/api/positions/:id', async (req, res) => {
   data.positions = (data.positions || []).filter(p => p.id !== req.params.id);
   await saveData(data);
   res.json({ success: true });
+});
+
+// ─────────────────────────────────────────────
+//  BACKTEST — DHAN HISTORICAL DATA
+// ─────────────────────────────────────────────
+
+// Dhan security IDs for all Nifty 50 stocks (NSE_EQ segment)
+// Source: Dhan securities master + docs
+const DHAN_SECURITY_IDS = {
+  'ADANIENT':   '25',     'ADANIPORTS': '15083',  'APOLLOHOSP': '157',
+  'ASIANPAINT': '236',    'AXISBANK':   '5900',   'BAJAJ-AUTO': '16675',
+  'BAJAJFINSV': '16669',  'BAJFINANCE': '317',    'BHARTIARTL': '10604',
+  'BPCL':       '526',    'BRITANNIA':  '547',    'CIPLA':      '694',
+  'COALINDIA':  '12070',  'DIVISLAB':   '15060',  'DRREDDY':    '881',
+  'EICHERMOT':  '910',    'GRASIM':     '1209',   'HCLTECH':    '7229',
+  'HDFCBANK':   '1333',   'HDFCLIFE':   '467533', 'HEROMOTOCO': '1348',
+  'HINDALCO':   '1363',   'HINDUNILVR': '1394',   'ICICIBANK':  '4963',
+  'INDUSINDBK': '5258',   'INFY':       '1594',   'ITC':        '1660',
+  'JSWSTEEL':   '11723',  'KOTAKBANK':  '1922',   'LT':         '11483',
+  'M&M':        '2031',   'MARUTI':     '10999',  'NESTLEIND':  '17963',
+  'NTPC':       '11630',  'ONGC':       '11351',  'POWERGRID':  '14977',
+  'RELIANCE':   '2885',   'SBILIFE':    '21808',  'SBIN':       '3045',
+  'SHRIRAMFIN': '3721',   'SUNPHARMA':  '3351',   'TATACONSUM': '3432',
+  'TATAMOTORS': '3456',   'TATASTEEL':  '3499',   'TCS':        '11536',
+  'TECHM':      '13538',  'TITAN':      '3506',   'TRENT':      '1964',
+  'ULTRACEMCO': '2952',   'WIPRO':      '3787',
+};
+
+async function fetchDhanHistory(securityId, accessToken, fromDate, toDate) {
+  const res = await fetch('https://api.dhan.co/v2/charts/historical', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'access-token': accessToken,
+    },
+    body: JSON.stringify({
+      securityId,
+      exchangeSegment: 'NSE_EQ',
+      instrument: 'EQUITY',
+      expiryCode: 0,
+      oi: false,
+      fromDate,
+      toDate,
+    }),
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => res.statusText);
+    throw new Error(`Dhan ${res.status}: ${txt.slice(0, 120)}`);
+  }
+
+  const data = await res.json();
+
+  // Dhan returns { open:[], high:[], low:[], close:[], volume:[], timestamp:[] }
+  const { open, high, low, close, volume, timestamp } = data;
+  if (!timestamp || !timestamp.length) throw new Error('No data returned');
+
+  return timestamp.map((ts, i) => ({
+    date:   new Date(ts * 1000).toISOString().split('T')[0],
+    open:   open[i],
+    high:   high[i],
+    low:    low[i],
+    close:  close[i],
+    volume: volume ? volume[i] : 0,
+  })).filter(r => r.high != null && r.low != null);
+}
+
+function runStrategySimulation(symbol, rows, tradeSize, fromDate) {
+  const TARGET_PCT  = [0.20, 0.15, 0.10, 0.05];
+  const TOLERANCE   = 0.005;   // 0.5% — practical equality with real data
+  const MAX_HOLD    = 120;
+
+  const trades = [];
+  let pos = null, gtt = null;
+
+  for (let i = 20; i < rows.length; i++) {
+    const today  = rows[i];
+    const w20    = rows.slice(i - 20, i);
+    const high20 = Math.max(...w20.map(r => r.high));
+    const low20  = Math.min(...w20.map(r => r.low));
+    const d      = today.date;
+
+    if (d < fromDate) continue;
+
+    if (pos !== null) {
+      const tp  = TARGET_PCT[Math.min(pos.avgCount, 3)];
+      const tgt = pos.avgPrice * (1 + tp);
+      const holdDays = Math.round((new Date(d) - new Date(pos.entryDate)) / 86400000);
+
+      // Target hit
+      if (today.high >= tgt) {
+        const qty = pos.totalInvested / pos.avgPrice;
+        trades.push({ symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
+          exit_date: d, exit_price: +tgt.toFixed(2), invested: +pos.totalInvested.toFixed(2),
+          pnl: +((tgt - pos.avgPrice) * qty).toFixed(2),
+          avg_count: pos.avgCount, exit_reason: 'TARGET',
+          hold_days: holdDays, target_pct: tp * 100 });
+        pos = null; gtt = null; continue;
+      }
+
+      // Max-hold timeout
+      if (holdDays >= MAX_HOLD) {
+        const qty = pos.totalInvested / pos.avgPrice;
+        const ep  = today.close;
+        trades.push({ symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
+          exit_date: d, exit_price: +ep.toFixed(2), invested: +pos.totalInvested.toFixed(2),
+          pnl: +((ep - pos.avgPrice) * qty).toFixed(2),
+          avg_count: pos.avgCount, exit_reason: 'TIMEOUT',
+          hold_days: holdDays, target_pct: tp * 100 });
+        pos = null; gtt = null; continue;
+      }
+
+      // Average down signal
+      if (pos.avgCount < 3) {
+        const atLow = Math.abs(today.low - low20) / low20 <= TOLERANCE;
+        if (atLow) gtt = { trigger: high20, avg: true };
+      }
+      if (gtt && gtt.avg) {
+        gtt.trigger = high20;
+        if (today.high >= gtt.trigger) {
+          const ap = gtt.trigger;
+          const oldQty = pos.totalInvested / pos.avgPrice;
+          const newQty = tradeSize / ap;
+          pos.avgCount++;
+          pos.avgPrice      = (pos.totalInvested + tradeSize) / (oldQty + newQty);
+          pos.totalInvested += tradeSize;
+          gtt = null;
+        }
+      }
+      continue;
+    }
+
+    // No position — look for 20D-low signal
+    const atLow = Math.abs(today.low - low20) / low20 <= TOLERANCE;
+    if (atLow) gtt = { trigger: high20, avg: false };
+
+    if (gtt && !gtt.avg) {
+      gtt.trigger = high20;
+      if (today.high >= gtt.trigger) {
+        pos = { entryDate: d, avgPrice: gtt.trigger,
+                totalInvested: tradeSize, avgCount: 0 };
+        gtt = null;
+      }
+    }
+  }
+
+  // MTM open position
+  if (pos) {
+    const last = rows[rows.length - 1];
+    const ep   = last.close;
+    const qty  = pos.totalInvested / pos.avgPrice;
+    const tp   = TARGET_PCT[Math.min(pos.avgCount, 3)];
+    const holdDays = Math.round((new Date(last.date) - new Date(pos.entryDate)) / 86400000);
+    trades.push({ symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
+      exit_date: last.date, exit_price: +ep.toFixed(2), invested: +pos.totalInvested.toFixed(2),
+      pnl: +((ep - pos.avgPrice) * qty).toFixed(2),
+      avg_count: pos.avgCount, exit_reason: 'OPEN',
+      hold_days: holdDays, target_pct: tp * 100 });
+  }
+
+  return trades;
+}
+
+// SSE backtest runner
+app.get('/api/backtest/run', async (req, res) => {
+  const { token, clientId, capital = 400000, tradeSize = 8000,
+          fromDate = '2021-01-01', toDate = '2026-03-27' } = req.query;
+
+  if (!token || !clientId) {
+    return res.status(400).json({ error: 'token and clientId required' });
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const send = obj => { res.write('data: ' + JSON.stringify(obj) + '\n\n'); if (res.flush) res.flush(); };
+
+  const symbols = Object.keys(DHAN_SECURITY_IDS);
+  const allTrades = [];
+  // Fetch data slightly before fromDate for 20-day warmup
+  const warmupDate = new Date(fromDate);
+  warmupDate.setDate(warmupDate.getDate() - 40);
+  const fetchFrom = warmupDate.toISOString().split('T')[0];
+
+  for (let i = 0; i < symbols.length; i++) {
+    const sym    = symbols[i];
+    const secId  = DHAN_SECURITY_IDS[sym];
+    let   status = 'OK', error = null, trades = [];
+
+    try {
+      const rows = await fetchDhanHistory(secId, token, fetchFrom, toDate);
+      if (rows.length < 25) throw new Error(`Only ${rows.length} candles`);
+      trades = runStrategySimulation(sym, rows, parseFloat(tradeSize), fromDate);
+      allTrades.push(...trades);
+      status = `${rows.length} candles · ${trades.length} trades`;
+    } catch (err) {
+      error  = err.message;
+      status = 'FAILED';
+    }
+
+    send({ type: 'progress', current: i + 1, total: symbols.length,
+           symbol: sym, status, error, trades });
+    await delay(350); // respect Dhan rate limits
+  }
+
+  // Aggregate summary
+  const closed   = allTrades.filter(t => t.exit_reason !== 'OPEN');
+  const open_t   = allTrades.filter(t => t.exit_reason === 'OPEN');
+  const wins     = closed.filter(t => t.pnl > 0);
+  const losses   = closed.filter(t => t.pnl <= 0);
+  const totalPnl = allTrades.reduce((s, t) => s + t.pnl, 0);
+  const finalVal = parseFloat(capital) + totalPnl;
+  const years    = (new Date(toDate) - new Date(fromDate)) / (365.25 * 86400000);
+  const cagr     = years > 0 ? ((finalVal / capital) ** (1 / years) - 1) * 100 : 0;
+  const winRate  = closed.length ? (wins.length / closed.length * 100) : 0;
+  const avgWin   = wins.length   ? wins.reduce((s,t)=>s+t.pnl,0)/wins.length     : 0;
+  const avgLoss  = losses.length ? losses.reduce((s,t)=>s+t.pnl,0)/losses.length : 0;
+  const avgHoldW = wins.length   ? wins.reduce((s,t)=>s+t.hold_days,0)/wins.length   : 0;
+  const avgHoldL = losses.length ? losses.reduce((s,t)=>s+t.hold_days,0)/losses.length : 0;
+
+  const byYear = {};
+  for (const t of closed) {
+    const y = t.exit_date.slice(0, 4);
+    if (!byYear[y]) byYear[y] = { pnl: 0, trades: 0, wins: 0, losses: 0, win_rate: 0 };
+    byYear[y].pnl    += t.pnl;
+    byYear[y].trades += 1;
+    if (t.pnl > 0) byYear[y].wins++; else byYear[y].losses++;
+  }
+  for (const y of Object.keys(byYear)) {
+    byYear[y].pnl      = +byYear[y].pnl.toFixed(2);
+    byYear[y].win_rate = +(byYear[y].wins / byYear[y].trades * 100).toFixed(1);
+  }
+
+  send({
+    type: 'complete',
+    summary: {
+      final_value:   +finalVal.toFixed(2),
+      total_pnl:     +totalPnl.toFixed(2),
+      cagr:          +cagr.toFixed(2),
+      closed_trades: closed.length,
+      open_trades:   open_t.length,
+      win_trades:    wins.length,
+      loss_trades:   losses.length,
+      win_rate:      +winRate.toFixed(2),
+      avg_win:       +avgWin.toFixed(2),
+      avg_loss:      +avgLoss.toFixed(2),
+      avg_hold_win:  +avgHoldW.toFixed(1),
+      avg_hold_loss: +avgHoldL.toFixed(1),
+    },
+    byYear,
+  });
+  res.end();
 });
 
 // ─────────────────────────────────────────────
