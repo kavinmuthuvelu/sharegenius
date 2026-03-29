@@ -1024,16 +1024,16 @@ const HTML_PAGE = `<!DOCTYPE html>
           <div style="display:flex;gap:6px;margin-top:6px;align-items:center;">
             <select class="form-input" id="bt-risk-mode" onchange="onRiskModeChange()" style="font-size:12px;padding:6px 8px;width:110px;">
               <option value="fixed">₹ Fixed</option>
-              <option value="pct">% of Capital</option>
+              <option value="pct" selected>% of Capital</option>
             </select>
-            <input class="form-input" id="bt-risk-value" value="8000" type="number" step="0.5" oninput="onRiskChange()" style="font-size:12px;flex:1;min-width:70px;" />
+            <input class="form-input" id="bt-risk-value" value="2" type="number" step="0.5" oninput="onRiskChange()" style="font-size:12px;flex:1;min-width:70px;" />
           </div>
-          <div class="form-hint" id="bt-risk-hint" style="margin-top:4px;">= ₹8,000 per trade</div>
+          <div class="form-hint" id="bt-risk-hint" style="margin-top:4px;">= ₹8,000 initial · grows as capital compounds</div>
         </div>
         <div class="stat-card" style="background:var(--gold-glow);border-color:rgba(245,166,35,0.3);">
           <div class="stat-label" style="color:var(--gold);">Effective Trade Size</div>
           <div class="stat-value" id="bt-effective-size" style="font-size:18px;margin-top:4px;">₹8,000</div>
-          <div class="stat-sub" id="bt-pct-of-capital">2.0% of capital</div>
+          <div class="stat-sub" id="bt-pct-of-capital">2.0% of capital • compounds on profit</div>
         </div>
       </div>
 
@@ -1094,6 +1094,31 @@ const HTML_PAGE = `<!DOCTYPE html>
           </div>
 
         </div>
+      </div>
+
+      <!-- ── ROW 4: Averaging Config ───────────────────────────────── -->
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius2);padding:14px 16px;margin-bottom:12px;">
+        <div style="font-size:12px;font-family:var(--mono);color:var(--cyan);font-weight:700;letter-spacing:0.5px;margin-bottom:12px;">🔄 AVERAGING CONFIG — Custom targets for every level</div>
+        <div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
+          <div style="min-width:190px;">
+            <label class="form-label">Max Averages Allowed</label>
+            <select class="form-input" id="bt-max-avg" style="font-size:12px;padding:6px 8px;" onchange="onMaxAvgChange()">
+              <option value="0">0 — No averaging</option>
+              <option value="1">1 average</option>
+              <option value="2">2 averages</option>
+              <option value="3" selected>3 averages</option>
+              <option value="4">4 averages</option>
+              <option value="5">5 averages</option>
+              <option value="6">6 averages</option>
+            </select>
+            <div class="form-hint">Max times to average down per trade</div>
+          </div>
+          <div style="font-size:11px;font-family:var(--mono);color:var(--text3);line-height:1.6;padding-bottom:20px;">
+            Each row below is the <strong style="color:var(--text2)">exit target %</strong> for that holding state.<br/>
+            Lower targets after averaging reflect higher averaged cost &amp; risk.
+          </div>
+        </div>
+        <div id="bt-targets-container" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:10px;"></div>
       </div>
       <!-- Bhavcopy info box -->
       <div id="bt-bhavcopy-info" style="display:none;background:var(--green-bg);border:1px solid var(--green);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;font-size:12px;font-family:var(--mono);color:var(--green);line-height:1.7;">
@@ -1169,6 +1194,7 @@ const HTML_PAGE = `<!DOCTYPE html>
                 <th class="num">Target</th>
                 <th class="num">P&amp;L ₹</th>
                 <th class="num">Return%</th>
+                <th class="num">Max%</th>
                 <th>Result</th>
               </tr>
             </thead>
@@ -1370,7 +1396,7 @@ function onRiskModeChange() {
     document.getElementById('bt-risk-value').value = 2;
     document.getElementById('bt-risk-value').step  = '0.5';
   } else {
-    document.getElementById('bt-risk-value').value = 8000;
+    document.getElementById('bt-risk-value').value = Math.round(cap * 0.02);
     document.getElementById('bt-risk-value').step  = '1000';
   }
   onRiskChange();
@@ -1380,11 +1406,13 @@ function onRiskChange() {
   const cap = parseFloat(document.getElementById('bt-capital').value) || 400000;
   const pct = ((ts / cap) * 100).toFixed(1);
   document.getElementById('bt-effective-size').textContent = \`\u20b9\${ts.toLocaleString('en-IN')}\`;
-  document.getElementById('bt-pct-of-capital').textContent = \`\${pct}% of capital\`;
-  document.getElementById('bt-risk-hint').textContent      =
-    document.getElementById('bt-risk-mode').value === 'pct'
-      ? \`= \u20b9\${ts.toLocaleString('en-IN')} per trade\`
-      : \`\${pct}% of capital per trade\`;
+  const isCompound = document.getElementById('bt-risk-mode').value === 'pct';
+  document.getElementById('bt-pct-of-capital').textContent = isCompound
+    ? \`\${pct}% of capital \u2022 compounds on profit\`
+    : \`\${pct}% of capital \u2022 fixed size\`;
+  document.getElementById('bt-risk-hint').textContent = isCompound
+    ? \`= \u20b9\${ts.toLocaleString('en-IN')} initial · grows as capital compounds\`
+    : \`\${pct}% of capital per trade (fixed)\`;
 }
 
 function switchBtSource(src) {
@@ -1397,13 +1425,47 @@ function switchBtSource(src) {
   document.getElementById('bt-bhavcopy-info').style.display  = isDhan ? 'none' : 'block';
 }
 
+// Ordinal helper
+const _ORD = ['Initial Buy','After 1st Avg','After 2nd Avg','After 3rd Avg','After 4th Avg','After 5th Avg','After 6th Avg'];
+const _HINT = ['Before any averaging','After 1 average-down','After 2 average-downs','After 3 average-downs','After 4 average-downs','After 5 average-downs','After 6 average-downs'];
+const _DEF  = [20, 15, 10, 8, 6, 5, 4]; // default target %
+
+function onMaxAvgChange() {
+  const n   = parseInt(document.getElementById('bt-max-avg').value);
+  const con = document.getElementById('bt-targets-container');
+  const existing = con.querySelectorAll('input[data-tidx]');
+  const vals = {};
+  existing.forEach(inp => { vals[inp.dataset.tidx] = inp.value; });
+
+  con.innerHTML = '';
+  for (let i = 0; i <= n; i++) {
+    const saved = vals[i] !== undefined ? vals[i] : _DEF[i];
+    const div = document.createElement('div');
+    div.style.cssText = 'background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;';
+    div.innerHTML = \`
+      <div style="font-size:10px;font-family:var(--mono);color:var(--cyan);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;">Level \${i} \u2014 \${_ORD[i]}</div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <input class="form-input" type="number" data-tidx="\${i}" value="\${saved}" min="0.5" max="200" step="0.5"
+          style="font-size:13px;font-weight:700;color:var(--gold);flex:1;text-align:right;" />
+        <span style="font-size:13px;color:var(--text2);font-family:var(--mono);">%</span>
+      </div>
+      <div class="form-hint">\${_HINT[i]}</div>\`;
+    con.appendChild(div);
+  }
+}
+
 function collectFilters() {
+  const maxAvg = parseInt(document.getElementById('bt-max-avg').value);
+  const targetInputs = document.querySelectorAll('#bt-targets-container input[data-tidx]');
+  const targets = Array.from(targetInputs).map(inp => parseFloat(inp.value) || _DEF[parseInt(inp.dataset.tidx)]);
   return {
     maType:    document.getElementById('bt-ma-type').value,
     maPeriod:  parseInt(document.getElementById('bt-ma-period').value) || 200,
     w52filter: document.getElementById('bt-52w-filter').value,
     volFilter: document.getElementById('bt-vol-filter').value,
     rsiFilter: document.getElementById('bt-rsi-filter').value,
+    maxAvg,
+    targets,
   };
 }
 
@@ -1416,7 +1478,14 @@ function runBacktest() {
   const toDate    = document.getElementById('bt-to').value;
   const filters   = collectFilters();
 
-  const fq = \`&maType=\${filters.maType}&maPeriod=\${filters.maPeriod}&w52filter=\${filters.w52filter}&volFilter=\${filters.volFilter}&rsiFilter=\${filters.rsiFilter}\`;
+  const riskMode = document.getElementById('bt-risk-mode').value;
+  const riskVal  = parseFloat(document.getElementById('bt-risk-value').value);
+  const riskPct  = riskMode === 'pct' ? riskVal : (riskVal / capital) * 100;
+
+  const fq = \`&maType=\${filters.maType}&maPeriod=\${filters.maPeriod}&w52filter=\${filters.w52filter}&volFilter=\${filters.volFilter}&rsiFilter=\${filters.rsiFilter}&maxAvg=\${filters.maxAvg}&targets=\${encodeURIComponent(filters.targets.join(','))}&riskPct=\${riskPct}\`;
+
+  // Also call onMaxAvgChange immediately after load to seed the dynamic rows if not yet rendered
+  if (!document.querySelector('#bt-targets-container input')) onMaxAvgChange();
 
   let url;
   if (source === 'dhan') {
@@ -1651,12 +1720,16 @@ function renderBtTrades() {
 
   if (!trades.length) {
     document.getElementById('bt-trade-tbody').innerHTML =
-      '<tr class="empty-row"><td colspan="12">No trades match filter</td></tr>';
+      '<tr class="empty-row"><td colspan="13">No trades match filter</td></tr>';
     return;
   }
 
   document.getElementById('bt-trade-tbody').innerHTML = trades.map(t => {
     const returnPct = t.invested > 0 ? ((t.pnl / t.invested) * 100).toFixed(1) : '—';
+    const isOpen    = t.exit_reason === 'OPEN';
+    const maxPctStr = (isOpen && t.max_profit_pct != null)
+      ? \`<span class="up">+\${t.max_profit_pct.toFixed(1)}%</span>\`
+      : '—';
     return \`<tr>
       <td><span class="sym-name">\${t.symbol}</span></td>
       <td class="num">\${t.entry_date}</td>
@@ -1669,9 +1742,10 @@ function renderBtTrades() {
       <td class="num" style="color:var(--gold)">\${t.target_pct}%</td>
       <td class="num \${t.pnl >= 0 ? 'up' : 'down'}">\${t.pnl >= 0 ? '+' : ''}\${fmtCurr(t.pnl, 0)}</td>
       <td class="num \${t.pnl >= 0 ? 'up' : 'down'}">\${t.pnl >= 0 ? '+' : ''}\${returnPct}%</td>
+      <td class="num">\${maxPctStr}</td>
       <td>
         \${t.exit_reason === 'TARGET' ? '<span class="badge badge-hit">\ud83c\udfaf TARGET</span>' :
-          t.exit_reason === 'OPEN'   ? '<span class="badge badge-open">\ud83d\udcc2 OPEN</span>'   :
+          isOpen                      ? '<span class="badge badge-open">\ud83d\udcc2 OPEN</span>'   :
                                         '<span class="badge badge-closed">EXIT</span>'}
       </td>
     </tr>\`;
@@ -2197,6 +2271,7 @@ function updatePositionsBadge() {
 //  INIT
 // ═══════════════════════════════════════════════════════
 (async function init() {
+  onMaxAvgChange(); // seed dynamic averaging target cards on load
   await Promise.all([loadWatchlist(), loadPositions()]);
 })();
 </script>
@@ -2698,17 +2773,19 @@ function calcAvgVolume(rows, period, i) {
   return sum / period;
 }
 
-function runStrategySimulation(symbol, rows, tradeSize, fromDate, opts = {}) {
-  const TARGET_PCT = [0.20, 0.15, 0.10, 0.05];
-  const TOLERANCE  = 0.005;
-
+function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, opts = {}) {
   const { maType = 'none', maPeriod = 200, w52filter = 'none',
-          volFilter = 'none', rsiFilter = 'none' } = opts;
-  const needMA    = maType !== 'none';
-  const need52W   = w52filter !== 'none';
-  const needVol   = volFilter !== 'none';
-  const needRSI   = rsiFilter !== 'none';
-  const volMult   = parseFloat(volFilter) || 1;
+          volFilter = 'none', rsiFilter = 'none',
+          maxAverages = 3,
+          targetPcts = [0.20, 0.15, 0.10, 0.05] } = opts;
+
+  const TOLERANCE     = 0.005;
+  const needMA        = maType !== 'none';
+  const need52W       = w52filter !== 'none';
+  const needVol       = volFilter !== 'none';
+  const needRSI       = rsiFilter !== 'none';
+  const volMult       = parseFloat(volFilter) || 1;
+  let   runningCapital = initialCapital;          // compounds as trades close
 
   const trades = [];
   let pos = null, gtt = null;
@@ -2725,28 +2802,35 @@ function runStrategySimulation(symbol, rows, tradeSize, fromDate, opts = {}) {
     if (d < fromDate) continue;
 
     if (pos !== null) {
-      const tp  = TARGET_PCT[Math.min(pos.avgCount, 3)];
+      // Track maximum high price achieved while position is open
+      if (today.high > pos.maxHigh) pos.maxHigh = today.high;
+
+      const tp  = targetPcts[Math.min(pos.avgCount, targetPcts.length - 1)];
       const tgt = pos.avgPrice * (1 + tp);
       const holdDays = Math.round((new Date(d) - new Date(pos.entryDate)) / 86400000);
 
       if (today.high >= tgt) {
         const qty = pos.totalInvested / pos.avgPrice;
+        const pnl = +((tgt - pos.avgPrice) * qty).toFixed(2);
+        runningCapital += pnl;                    // ← add profit back to capital
         trades.push({ symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
           exit_date: d, exit_price: +tgt.toFixed(2), invested: +pos.totalInvested.toFixed(2),
-          pnl: +((tgt - pos.avgPrice) * qty).toFixed(2),
+          pnl,
           avg_count: pos.avgCount, exit_reason: 'TARGET',
-          hold_days: holdDays, target_pct: tp * 100 });
+          hold_days: holdDays, target_pct: +(tp * 100).toFixed(1),
+          capital_after: +runningCapital.toFixed(2) });
         pos = null; gtt = null; continue;
       }
 
-      if (pos.avgCount < 3) {
+      if (pos.avgCount < maxAverages) {
         const atLow = Math.abs(today.low - low20) / low20 <= TOLERANCE;
         if (atLow) gtt = { trigger: high20, avg: true };
       }
       if (gtt && gtt.avg) {
         gtt.trigger = high20;
         if (today.high >= gtt.trigger) {
-          const ap = gtt.trigger;
+          const ap     = gtt.trigger;
+          const tradeSize = runningCapital * (riskPct / 100);  // dynamic avg size
           const oldQty = pos.totalInvested / pos.avgPrice;
           const newQty = tradeSize / ap;
           pos.avgCount++;
@@ -2785,8 +2869,10 @@ function runStrategySimulation(symbol, rows, tradeSize, fromDate, opts = {}) {
           }
         }
         if (!blocked) {
+          const tradeSize = runningCapital * (riskPct / 100);  // dynamic entry size
           pos = { entryDate: d, avgPrice: gtt.trigger,
-                  totalInvested: tradeSize, avgCount: 0 };
+                  totalInvested: tradeSize, avgCount: 0,
+                  maxHigh: gtt.trigger };
           gtt = null;
           continue;
         }
@@ -2833,16 +2919,20 @@ function runStrategySimulation(symbol, rows, tradeSize, fromDate, opts = {}) {
     const last = rows[rows.length - 1];
     const ep   = last.close;
     const qty  = pos.totalInvested / pos.avgPrice;
-    const tp   = TARGET_PCT[Math.min(pos.avgCount, 3)];
+    const tp   = targetPcts[Math.min(pos.avgCount, targetPcts.length - 1)];
     const holdDays = Math.round((new Date(last.date) - new Date(pos.entryDate)) / 86400000);
+    const maxProfitPct = pos.maxHigh > pos.avgPrice
+      ? +((pos.maxHigh - pos.avgPrice) / pos.avgPrice * 100).toFixed(2)
+      : 0;
     trades.push({ symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
       exit_date: last.date, exit_price: +ep.toFixed(2), invested: +pos.totalInvested.toFixed(2),
       pnl: +((ep - pos.avgPrice) * qty).toFixed(2),
       avg_count: pos.avgCount, exit_reason: 'OPEN',
-      hold_days: holdDays, target_pct: tp * 100 });
+      hold_days: holdDays, target_pct: +(tp * 100).toFixed(1),
+      max_profit_pct: maxProfitPct });
   }
 
-  return trades;
+  return { trades, finalCapital: runningCapital };
 }
 
 
@@ -2851,8 +2941,15 @@ app.get('/api/backtest/run', async (req, res) => {
   const { token, clientId, capital = 400000, tradeSize = 8000,
           fromDate = '2021-01-01', toDate = '2026-03-27',
           maType = 'none', maPeriod = '200', w52filter = 'none',
-          volFilter = 'none', rsiFilter = 'none' } = req.query;
-  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter };
+          volFilter = 'none', rsiFilter = 'none',
+          maxAvg = '3', targets = '20,15,10,8,6,5,4',
+          riskPct = '2' } = req.query;
+
+  const cap         = parseFloat(capital);
+  const riskPctNum  = parseFloat(riskPct) || 2;
+  const targetPcts  = targets.split(',').map(v => parseFloat(v.trim()) / 100).filter(v => !isNaN(v));
+  const maxAverages = parseInt(maxAvg);
+  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts };
 
   if (!token || !clientId) {
     return res.status(400).json({ error: 'token and clientId required' });
@@ -2880,7 +2977,8 @@ app.get('/api/backtest/run', async (req, res) => {
     try {
       const rows = await fetchDhanHistory(secId, token, fetchFrom, toDate);
       if (rows.length < 25) throw new Error(`Only ${rows.length} candles`);
-      trades = runStrategySimulation(sym, rows, parseFloat(tradeSize), fromDate, simOpts);
+      const result = runStrategySimulation(sym, rows, cap, riskPctNum, fromDate, simOpts);
+      trades = result.trades;
       allTrades.push(...trades);
       status = `${rows.length} candles · ${trades.length} trades`;
     } catch (err) {
@@ -2893,13 +2991,13 @@ app.get('/api/backtest/run', async (req, res) => {
     await delay(350); // respect Dhan rate limits
   }
 
-  // Aggregate summary
+  // Aggregate summary — use compounded P&L for final value
   const closed   = allTrades.filter(t => t.exit_reason !== 'OPEN');
   const open_t   = allTrades.filter(t => t.exit_reason === 'OPEN');
   const wins     = closed.filter(t => t.pnl > 0);
   const losses   = closed.filter(t => t.pnl <= 0);
   const totalPnl = allTrades.reduce((s, t) => s + t.pnl, 0);
-  const finalVal = parseFloat(capital) + totalPnl;
+  const finalVal = cap + totalPnl;
   const years    = (new Date(toDate) - new Date(fromDate)) / (365.25 * 86400000);
   const cagr     = years > 0 ? ((finalVal / capital) ** (1 / years) - 1) * 100 : 0;
   const winRate  = closed.length ? (wins.length / closed.length * 100) : 0;
@@ -3088,8 +3186,15 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
     toDate    = new Date().toISOString().split('T')[0],
     maType = 'none', maPeriod = '200', w52filter = 'none',
     volFilter = 'none', rsiFilter = 'none',
+    maxAvg = '3', targets = '20,15,10,8,6,5,4',
+    riskPct = '2',
   } = req.query;
-  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter };
+
+  const cap         = parseFloat(capital);
+  const riskPctNum  = parseFloat(riskPct) || 2;
+  const targetPcts  = targets.split(',').map(v => parseFloat(v.trim()) / 100).filter(v => !isNaN(v));
+  const maxAverages = parseInt(maxAvg);
+  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts };
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -3159,12 +3264,11 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
   for (const sym of symSet) {
     const rows = stockData[sym].sort((a, b) => a.date.localeCompare(b.date));
     if (rows.length < 25) continue;
-    const trades = runStrategySimulation(sym, rows, parseFloat(tradeSize), fromDate, simOpts);
-    allTrades.push(...trades);
+    const result = runStrategySimulation(sym, rows, cap, riskPctNum, fromDate, simOpts);
+    allTrades.push(...result.trades);
   }
 
-  // Aggregate — same as Dhan backtest
-  const cap      = parseFloat(capital);
+  // Aggregate — compounded P&L
   const closed   = allTrades.filter(t => t.exit_reason !== 'OPEN');
   const open_t   = allTrades.filter(t => t.exit_reason === 'OPEN');
   const wins     = closed.filter(t => t.pnl > 0);
