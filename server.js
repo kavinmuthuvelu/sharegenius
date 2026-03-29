@@ -1340,8 +1340,13 @@ function runBacktest() {
       document.getElementById('bt-run-btn').innerHTML = '▶ Run Backtest';
       document.getElementById('bt-run-btn').disabled = false;
       document.getElementById('bt-progress-wrap').classList.remove('visible');
+      // Load all trades from the definitive complete payload
+      if (msg.trades && msg.trades.length) {
+        state_bt.trades = msg.trades;
+      }
       renderBtResults(msg.summary, msg.byYear, capital);
-      toast(\`Backtest complete — \${msg.summary.closed_trades} trades on real NSE data\`, 'success');
+      const src = msg.source === 'bhavcopy' ? 'NSE Bhavcopy' : 'Dhan API';
+      toast(\`Backtest complete [\${src}] — \${msg.summary.closed_trades} trades, \${msg.summary.win_rate}% win rate\`, 'success');
     }
 
     if (msg.type === 'error') {
@@ -1449,9 +1454,8 @@ function renderBtTrades() {
       <td class="num" style="color:var(--gold)">\${t.target_pct}%</td>
       <td class="num \${t.pnl >= 0 ? 'up' : 'down'}">\${t.pnl >= 0 ? '+' : ''}\${fmtCurr(t.pnl, 0)}</td>
       <td>
-        \${t.exit_reason === 'TARGET' ? '<span class="badge badge-hit">TARGET</span>' :
-          t.exit_reason === 'OPEN'   ? '<span class="badge badge-open">OPEN</span>'   :
-          t.exit_reason === 'TIMEOUT'? '<span class="badge badge-closed">TIMEOUT</span>' :
+        \${t.exit_reason === 'TARGET' ? '<span class="badge badge-hit">🎯 TARGET</span>' :
+          t.exit_reason === 'OPEN'   ? '<span class="badge badge-open">📂 OPEN</span>'   :
                                         '<span class="badge badge-closed">EXIT</span>'}
       </td>
     </tr>\`).join('');
@@ -2438,7 +2442,8 @@ async function fetchDhanHistory(securityId, accessToken, fromDate, toDate) {
 function runStrategySimulation(symbol, rows, tradeSize, fromDate) {
   const TARGET_PCT  = [0.20, 0.15, 0.10, 0.05];
   const TOLERANCE   = 0.005;   // 0.5% — practical equality with real data
-  const MAX_HOLD    = 120;
+  // NO stop-loss, NO timeout — strategy says hold indefinitely and average down
+  // Losses only appear for positions still open at end of backtest window (MTM)
 
   const trades = [];
   let pos = null, gtt = null;
@@ -2457,25 +2462,13 @@ function runStrategySimulation(symbol, rows, tradeSize, fromDate) {
       const tgt = pos.avgPrice * (1 + tp);
       const holdDays = Math.round((new Date(d) - new Date(pos.entryDate)) / 86400000);
 
-      // Target hit
+      // Target hit — only exit condition (no stop-loss, no timeout)
       if (today.high >= tgt) {
         const qty = pos.totalInvested / pos.avgPrice;
         trades.push({ symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
           exit_date: d, exit_price: +tgt.toFixed(2), invested: +pos.totalInvested.toFixed(2),
           pnl: +((tgt - pos.avgPrice) * qty).toFixed(2),
           avg_count: pos.avgCount, exit_reason: 'TARGET',
-          hold_days: holdDays, target_pct: tp * 100 });
-        pos = null; gtt = null; continue;
-      }
-
-      // Max-hold timeout
-      if (holdDays >= MAX_HOLD) {
-        const qty = pos.totalInvested / pos.avgPrice;
-        const ep  = today.close;
-        trades.push({ symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
-          exit_date: d, exit_price: +ep.toFixed(2), invested: +pos.totalInvested.toFixed(2),
-          pnl: +((ep - pos.avgPrice) * qty).toFixed(2),
-          avg_count: pos.avgCount, exit_reason: 'TIMEOUT',
           hold_days: holdDays, target_pct: tp * 100 });
         pos = null; gtt = null; continue;
       }
@@ -2605,6 +2598,7 @@ app.get('/api/backtest/run', async (req, res) => {
 
   send({
     type: 'complete',
+    trades: allTrades,
     summary: {
       final_value:   +finalVal.toFixed(2),
       total_pnl:     +totalPnl.toFixed(2),
@@ -2874,6 +2868,7 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
     type: 'complete',
     source: 'bhavcopy',
     dataStats: { tradingDays: processed, holidays, errors },
+    trades: allTrades,
     summary: {
       final_value:   +finalVal.toFixed(2),
       total_pnl:     +totalPnl.toFixed(2),
