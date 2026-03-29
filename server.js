@@ -986,11 +986,19 @@ const HTML_PAGE = `<!DOCTYPE html>
         </div>
       </div>
 
-      <!-- Source toggle -->
-      <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;">
-        <span style="font-size:12px;color:var(--text2);font-family:var(--mono);">DATA SOURCE:</span>
-        <button class="idx-btn active" id="src-dhan" onclick="switchBtSource('dhan')">🔐 Dhan API</button>
-        <button class="idx-btn" id="src-bhavcopy" onclick="switchBtSource('bhavcopy')">📂 NSE Bhavcopy (Free)</button>
+      <!-- Source toggle + Universe -->
+      <div style="display:flex;gap:16px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span style="font-size:12px;color:var(--text2);font-family:var(--mono);">DATA SOURCE:</span>
+          <button class="idx-btn active" id="src-dhan" onclick="switchBtSource('dhan')">🔐 Dhan API</button>
+          <button class="idx-btn" id="src-bhavcopy" onclick="switchBtSource('bhavcopy')">📂 NSE Bhavcopy (Free)</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span style="font-size:12px;color:var(--text2);font-family:var(--mono);">UNIVERSE:</span>
+          <button class="idx-btn active" id="bt-uni-n50"   onclick="switchBtUniverse('NIFTY50')">NIFTY 50</button>
+          <button class="idx-btn"        id="bt-uni-nn50"  onclick="switchBtUniverse('NIFTYNEXT50')">NIFTY NEXT 50</button>
+          <button class="idx-btn"        id="bt-uni-n100"  onclick="switchBtUniverse('NIFTY100')">NIFTY 100</button>
+        </div>
       </div>
 
       <!-- ── ROW 1: Credentials + Dates ──────────────────────── -->
@@ -1195,6 +1203,7 @@ const HTML_PAGE = `<!DOCTYPE html>
                 <th class="num">P&amp;L ₹</th>
                 <th class="num">Return%</th>
                 <th class="num">Max%</th>
+                <th class="num" style="color:var(--gold)">Capital After ₹</th>
                 <th>Result</th>
               </tr>
             </thead>
@@ -1376,9 +1385,17 @@ function switchTab(tab) {
 // ═══════════════════════════════════════════════════════
 //  BACKTEST — Dhan Historical API
 // ═══════════════════════════════════════════════════════
-const state_bt = { trades: [], running: false };
+const state_bt = { trades: [], running: false, startCapital: 400000 };
 
-const state_bt_source = { current: 'dhan' };
+const state_bt_source   = { current: 'dhan' };
+const state_bt_universe = { current: 'NIFTY50' };
+
+function switchBtUniverse(u) {
+  state_bt_universe.current = u;
+  document.querySelectorAll('#bt-uni-n50,#bt-uni-nn50,#bt-uni-n100').forEach(b => b.classList.remove('active'));
+  const map = { 'NIFTY50': 'bt-uni-n50', 'NIFTYNEXT50': 'bt-uni-nn50', 'NIFTY100': 'bt-uni-n100' };
+  document.getElementById(map[u]).classList.add('active');
+}
 
 // ── Risk helpers ─────────────────────────────────────────────────────────────
 function getEffectiveTradeSize() {
@@ -1487,18 +1504,21 @@ function runBacktest() {
   // Also call onMaxAvgChange immediately after load to seed the dynamic rows if not yet rendered
   if (!document.querySelector('#bt-targets-container input')) onMaxAvgChange();
 
+  const universe = state_bt_universe.current;
+  const fqU = fq + \`&universe=\${universe}\`;
   let url;
   if (source === 'dhan') {
     const token    = document.getElementById('bt-token').value.trim();
     const clientId = document.getElementById('bt-client-id').value.trim();
     if (!token || !clientId) return toast('Enter Dhan Client ID and Access Token', 'error');
-    url = \`/api/backtest/run?token=\${encodeURIComponent(token)}&clientId=\${encodeURIComponent(clientId)}&capital=\${capital}&tradeSize=\${tradeSize}&fromDate=\${fromDate}&toDate=\${toDate}\${fq}\`;
+    url = \`/api/backtest/run?token=\${encodeURIComponent(token)}&clientId=\${encodeURIComponent(clientId)}&capital=\${capital}&tradeSize=\${tradeSize}&fromDate=\${fromDate}&toDate=\${toDate}\${fqU}\`;
   } else {
-    url = \`/api/backtest/bhavcopy?capital=\${capital}&tradeSize=\${tradeSize}&fromDate=\${fromDate}&toDate=\${toDate}\${fq}\`;
+    url = \`/api/backtest/bhavcopy?capital=\${capital}&tradeSize=\${tradeSize}&fromDate=\${fromDate}&toDate=\${toDate}\${fqU}\`;
   }
 
-  state_bt.running = true;
-  state_bt.trades  = [];
+  state_bt.running      = true;
+  state_bt.trades       = [];
+  state_bt.startCapital = capital;
   document.getElementById('bt-run-btn').innerHTML = '<span class="spinner"></span> Running...';
   document.getElementById('bt-run-btn').disabled = true;
   document.getElementById('bt-progress-wrap').classList.add('visible');
@@ -1591,6 +1611,11 @@ function renderBtResults(summary, byYear, capital) {
       <div class="stat-label">Open Positions MTM</div>
       <div class="stat-value \${summary.avg_loss >= 0 ? 'green' : 'red'}">\${fmtCurr(summary.avg_loss, 0)}</div>
       <div class="stat-sub">avg open P&L, \${summary.open_trades} positions</div>
+    </div>
+    <div class="stat-card" style="\${summary.min_capital < capital * 0.9 ? 'background:var(--red-bg);border-color:rgba(240,82,82,0.4);' : 'background:var(--green-bg);border-color:rgba(34,217,122,0.3);'}">
+      <div class="stat-label" style="color:\${summary.min_capital < capital * 0.9 ? 'var(--red)' : 'var(--green)'}">⚠️ Lowest Capital</div>
+      <div class="stat-value \${summary.min_capital < capital * 0.9 ? 'red' : 'green'}">\${fmtCurr(summary.min_capital || capital, 0)}</div>
+      <div class="stat-sub">\${summary.min_capital_date ? 'on ' + summary.min_capital_date : 'Capital never dipped'}</div>
     </div>\`;
 
   document.getElementById('bt-year-tbody').innerHTML = Object.entries(byYear).map(([y, v]) => \`
@@ -1720,7 +1745,7 @@ function renderBtTrades() {
 
   if (!trades.length) {
     document.getElementById('bt-trade-tbody').innerHTML =
-      '<tr class="empty-row"><td colspan="13">No trades match filter</td></tr>';
+      '<tr class="empty-row"><td colspan="14">No trades match filter</td></tr>';
     return;
   }
 
@@ -1730,6 +1755,13 @@ function renderBtTrades() {
     const maxPctStr = (isOpen && t.max_profit_pct != null)
       ? \`<span class="up">+\${t.max_profit_pct.toFixed(1)}%</span>\`
       : '—';
+    // Capital after: green if grew, red if below start, grey if open
+    const capAfter  = t.capital_after;
+    const capStyle  = capAfter == null ? 'color:var(--text3)'
+                    : capAfter >= state_bt.startCapital ? 'color:var(--green);font-weight:700'
+                    : 'color:var(--red);font-weight:700';
+    const capStr    = capAfter == null ? '<span style="color:var(--text3)">Still open</span>'
+                    : \`<span style="\${capStyle}">\${fmtCurr(capAfter, 0)}</span>\`;
     return \`<tr>
       <td><span class="sym-name">\${t.symbol}</span></td>
       <td class="num">\${t.entry_date}</td>
@@ -1743,6 +1775,7 @@ function renderBtTrades() {
       <td class="num \${t.pnl >= 0 ? 'up' : 'down'}">\${t.pnl >= 0 ? '+' : ''}\${fmtCurr(t.pnl, 0)}</td>
       <td class="num \${t.pnl >= 0 ? 'up' : 'down'}">\${t.pnl >= 0 ? '+' : ''}\${returnPct}%</td>
       <td class="num">\${maxPctStr}</td>
+      <td class="num">\${capStr}</td>
       <td>
         \${t.exit_reason === 'TARGET' ? '<span class="badge badge-hit">\ud83c\udfaf TARGET</span>' :
           isOpen                      ? '<span class="badge badge-open">\ud83d\udcc2 OPEN</span>'   :
@@ -2672,7 +2705,8 @@ app.delete('/api/positions/:id', async (req, res) => {
 
 // Dhan security IDs for all Nifty 50 stocks (NSE_EQ segment)
 // Source: Dhan securities master + docs
-const DHAN_SECURITY_IDS = {
+// ── Nifty 50 security IDs (NSE_EQ segment) ───────────────────────────────────
+const DHAN_NIFTY50_IDS = {
   'ADANIENT':   '25',     'ADANIPORTS': '15083',  'APOLLOHOSP': '157',
   'ASIANPAINT': '236',    'AXISBANK':   '5900',   'BAJAJ-AUTO': '16675',
   'BAJAJFINSV': '16669',  'BAJFINANCE': '317',    'BHARTIARTL': '10604',
@@ -2690,6 +2724,39 @@ const DHAN_SECURITY_IDS = {
   'TATAMOTORS': '3456',   'TATASTEEL':  '3499',   'TCS':        '11536',
   'TECHM':      '13538',  'TITAN':      '3506',   'TRENT':      '1964',
   'ULTRACEMCO': '2952',   'WIPRO':      '3787',
+};
+
+// ── Nifty Next 50 security IDs (NSE_EQ segment) ───────────────────────────────
+const DHAN_NEXT50_IDS = {
+  'ABB':        '13',     'ADANIGREEN': '542424', 'ADANIPOWER': '532978',
+  'ALKEM':      '539523', 'AMBUJACEM':  '1270',   'AUROPHARMA': '532',
+  'BAJAJHLDNG': '480',    'BANKBARODA': '532134', 'BEL':        '542726',
+  'BERGEPAINT': '509480', 'BOSCHLTD':   '500530', 'CANBK':      '532483',
+  'CHOLAFIN':   '537875', 'COLPAL':     '510477', 'DLF':        '532868',
+  'GAIL':       '532155', 'GICRE':      '540755', 'GLAND':      '543321',
+  'GODREJCP':   '532424', 'GODREJPROP': '532733', 'HAVELLS':    '517354',
+  'INDHOTEL':   '500850', 'INDIGO':     '539448', 'IRCTC':      '542830',
+  'JINDALSTEL': '532286', 'LTIM':       '540005', 'LUPIN':      '500257',
+  'MCDOWELL-N': '532432', 'MFSL':       '500271', 'NHPC':       '533098',
+  'NMDC':       '526371', 'NYKAA':      '543574', 'OBEROIRLTY': '533273',
+  'OFSS':       '532467', 'PAGEIND':    '532827', 'PERSISTENT': '533179',
+  'PIIND':      '523642', 'PIDILITIND': '500331', 'PNB':        '532461',
+  'RECLTD':     '532955', 'SAIL':       '500113', 'SBICARD':    '543066',
+  'SIEMENS':    '500550', 'SRF':        '503806', 'TATACOMM':   '500483',
+  'TATAPOWER':  '500400', 'TORNTPHARM': '500384', 'TORNTPOWER': '532779',
+  'TVSMOTOR':   '532343', 'UBL':        '532478', 'UNIONBANK':  '532477',
+  'UPL':        '512070', 'VBL':        '544171', 'VEDL':       '500295',
+  'VOLTAS':     '500575', 'ZOMATO':     '543320', 'ZYDUSLIFE':  '539838',
+};
+
+// Combined map — used for lookups by both Dhan and Bhavcopy routes
+const DHAN_SECURITY_IDS = { ...DHAN_NIFTY50_IDS, ...DHAN_NEXT50_IDS };
+
+// Universe selector — maps UI key → symbol list
+const BT_UNIVERSES = {
+  'NIFTY50':    Object.keys(DHAN_NIFTY50_IDS),
+  'NIFTYNEXT50': Object.keys(DHAN_NEXT50_IDS),
+  'NIFTY100':   [...new Set([...Object.keys(DHAN_NIFTY50_IDS), ...Object.keys(DHAN_NEXT50_IDS)])],
 };
 
 async function fetchDhanHistory(securityId, accessToken, fromDate, toDate) {
@@ -2936,6 +3003,34 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
 }
 
 
+// ── Compute chronological running capital across all trades ──────────────────
+// Sorts closed trades by exit_date, walks cumulative P&L so each trade shows
+// exact capital remaining. Open (MTM) trades show null — capital still deployed.
+function attachCapitalTracking(allTrades, startCapital) {
+  const closed = allTrades
+    .filter(t => t.exit_reason !== 'OPEN')
+    .sort((a, b) => a.exit_date.localeCompare(b.exit_date));
+
+  let running = startCapital;
+  let minCapital = startCapital;
+  let minCapitalDate = '';
+
+  for (const t of closed) {
+    running += t.pnl;
+    t.capital_after = +running.toFixed(2);
+    if (running < minCapital) {
+      minCapital     = running;
+      minCapitalDate = t.exit_date;
+    }
+  }
+
+  for (const t of allTrades) {
+    if (t.exit_reason === 'OPEN') t.capital_after = null;
+  }
+
+  return { minCapital: +minCapital.toFixed(2), minCapitalDate, finalCapital: +running.toFixed(2) };
+}
+
 // SSE backtest runner
 app.get('/api/backtest/run', async (req, res) => {
   const { token, clientId, capital = 400000, tradeSize = 8000,
@@ -2943,7 +3038,7 @@ app.get('/api/backtest/run', async (req, res) => {
           maType = 'none', maPeriod = '200', w52filter = 'none',
           volFilter = 'none', rsiFilter = 'none',
           maxAvg = '3', targets = '20,15,10,8,6,5,4',
-          riskPct = '2' } = req.query;
+          riskPct = '2', universe = 'NIFTY50' } = req.query;
 
   const cap         = parseFloat(capital);
   const riskPctNum  = parseFloat(riskPct) || 2;
@@ -2962,7 +3057,7 @@ app.get('/api/backtest/run', async (req, res) => {
 
   const send = obj => { res.write('data: ' + JSON.stringify(obj) + '\n\n'); if (res.flush) res.flush(); };
 
-  const symbols = Object.keys(DHAN_SECURITY_IDS);
+  const symbols = BT_UNIVERSES[universe] || BT_UNIVERSES['NIFTY50'];
   const allTrades = [];
   // Fetch data slightly before fromDate for 20-day warmup
   const warmupDate = new Date(fromDate);
@@ -2990,6 +3085,9 @@ app.get('/api/backtest/run', async (req, res) => {
            symbol: sym, status, error, trades });
     await delay(350); // respect Dhan rate limits
   }
+
+  // Attach chronological capital tracking to each trade
+  const capStats = attachCapitalTracking(allTrades, cap);
 
   // Aggregate summary — use compounded P&L for final value
   const closed   = allTrades.filter(t => t.exit_reason !== 'OPEN');
@@ -3035,6 +3133,9 @@ app.get('/api/backtest/run', async (req, res) => {
       avg_loss:      +avgLoss.toFixed(2),
       avg_hold_win:  +avgHoldW.toFixed(1),
       avg_hold_loss: +avgHoldL.toFixed(1),
+      min_capital:   capStats.minCapital,
+      min_capital_date: capStats.minCapitalDate,
+      universe,
     },
     byYear,
   });
@@ -3187,7 +3288,7 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
     maType = 'none', maPeriod = '200', w52filter = 'none',
     volFilter = 'none', rsiFilter = 'none',
     maxAvg = '3', targets = '20,15,10,8,6,5,4',
-    riskPct = '2',
+    riskPct = '2', universe = 'NIFTY50',
   } = req.query;
 
   const cap         = parseFloat(capital);
@@ -3206,7 +3307,7 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
     if (res.flush) res.flush();
   };
 
-  const symSet   = new Set(Object.keys(DHAN_SECURITY_IDS));
+  const symSet   = new Set(BT_UNIVERSES[universe] || BT_UNIVERSES['NIFTY50']);
   const allDays  = getWeekdays(fromDate, toDate);
   const total    = allDays.length;
 
@@ -3268,6 +3369,9 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
     allTrades.push(...result.trades);
   }
 
+  // Attach chronological capital tracking to each trade
+  const capStats = attachCapitalTracking(allTrades, cap);
+
   // Aggregate — compounded P&L
   const closed   = allTrades.filter(t => t.exit_reason !== 'OPEN');
   const open_t   = allTrades.filter(t => t.exit_reason === 'OPEN');
@@ -3314,11 +3418,15 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
       avg_loss:      +avgLoss.toFixed(2),
       avg_hold_win:  +avgHoldW.toFixed(1),
       avg_hold_loss: +avgHoldL.toFixed(1),
+      min_capital:      capStats.minCapital,
+      min_capital_date: capStats.minCapitalDate,
+      universe,
     },
     byYear,
   });
   res.end();
 });
+
 
 // ─────────────────────────────────────────────
 //  HEALTH CHECK
