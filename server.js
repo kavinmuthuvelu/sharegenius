@@ -2758,11 +2758,46 @@ function runStrategySimulation(symbol, rows, tradeSize, fromDate, opts = {}) {
       continue;
     }
 
-    // ── Entry filters ──────────────────────────────────────────
-    const atLow = Math.abs(today.low - low20) / low20 <= TOLERANCE;
-    if (!atLow) { if (gtt && !gtt.avg) gtt.trigger = high20; continue; }
+    // ── No open position: check if pending GTT fires today (before signal check) ──
+    if (gtt && !gtt.avg) {
+      gtt.trigger = high20; // keep GTT updated to rolling 20D high
+      if (today.high >= gtt.trigger) {
+        // Apply entry filters before firing GTT
+        let blocked = false;
+        if (needMA) {
+          const ma = maType === 'sma' ? calcSMA(rows, maPeriod, i) : calcEMA(rows, maPeriod, i);
+          if (ma !== null && today.close < ma) { gtt = null; blocked = true; }
+        }
+        if (!blocked && need52W && i >= 252) {
+          const { low52 } = calc52WRange(rows, i);
+          if (w52filter === 'near'  && today.close > low52 * 1.10) { gtt = null; blocked = true; }
+          if (w52filter === 'below' && today.close > low52)         { gtt = null; blocked = true; }
+        }
+        if (!blocked && needVol && today.volume) {
+          const avgVol = calcAvgVolume(rows, 20, i);
+          if (avgVol && today.volume < avgVol * volMult) { gtt = null; blocked = true; }
+        }
+        if (!blocked && needRSI) {
+          const rsi = calcRSI(rows, 14, i);
+          if (rsi !== null) {
+            if (rsiFilter === 'os'   && rsi >= 40) { gtt = null; blocked = true; }
+            if (rsiFilter === 'os30' && rsi >= 30) { gtt = null; blocked = true; }
+          }
+        }
+        if (!blocked) {
+          pos = { entryDate: d, avgPrice: gtt.trigger,
+                  totalInvested: tradeSize, avgCount: 0 };
+          gtt = null;
+          continue;
+        }
+      }
+    }
 
-    // MA filter — price must be above SMA/EMA(N)
+    // ── Check if today is a new 20D low signal — set/refresh GTT ──────────────
+    const atLow = Math.abs(today.low - low20) / low20 <= TOLERANCE;
+    if (!atLow) continue; // nothing to do today
+
+    // MA filter — only set GTT if stock is in uptrend
     if (needMA) {
       const ma = maType === 'sma' ? calcSMA(rows, maPeriod, i) : calcEMA(rows, maPeriod, i);
       if (ma !== null && today.close < ma) { gtt = null; continue; }
@@ -2775,7 +2810,7 @@ function runStrategySimulation(symbol, rows, tradeSize, fromDate, opts = {}) {
       if (w52filter === 'below' && today.close > low52)         { gtt = null; continue; }
     }
 
-    // Volume filter — today's volume must be X times the 20D avg
+    // Volume filter
     if (needVol && today.volume) {
       const avgVol = calcAvgVolume(rows, 20, i);
       if (avgVol && today.volume < avgVol * volMult) { gtt = null; continue; }
@@ -2785,22 +2820,13 @@ function runStrategySimulation(symbol, rows, tradeSize, fromDate, opts = {}) {
     if (needRSI) {
       const rsi = calcRSI(rows, 14, i);
       if (rsi !== null) {
-        if (rsiFilter === 'os'  && rsi >= 40) { gtt = null; continue; }
-        if (rsiFilter === 'os30'&& rsi >= 30) { gtt = null; continue; }
+        if (rsiFilter === 'os'   && rsi >= 40) { gtt = null; continue; }
+        if (rsiFilter === 'os30' && rsi >= 30) { gtt = null; continue; }
       }
     }
 
-    // Signal confirmed — set/update GTT
-    if (atLow) gtt = { trigger: high20, avg: false };
-
-    if (gtt && !gtt.avg) {
-      gtt.trigger = high20;
-      if (today.high >= gtt.trigger) {
-        pos = { entryDate: d, avgPrice: gtt.trigger,
-                totalInvested: tradeSize, avgCount: 0 };
-        gtt = null;
-      }
-    }
+    // Set/update GTT with today's 20D high as trigger
+    gtt = { trigger: high20, avg: false };
   }
 
   if (pos) {
