@@ -986,19 +986,11 @@ const HTML_PAGE = `<!DOCTYPE html>
         </div>
       </div>
 
-      <!-- Source toggle + Universe -->
-      <div style="display:flex;gap:16px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
-        <div style="display:flex;gap:8px;align-items:center;">
-          <span style="font-size:12px;color:var(--text2);font-family:var(--mono);">DATA SOURCE:</span>
-          <button class="idx-btn active" id="src-dhan" onclick="switchBtSource('dhan')">🔐 Dhan API</button>
-          <button class="idx-btn" id="src-bhavcopy" onclick="switchBtSource('bhavcopy')">📂 NSE Bhavcopy (Free)</button>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <span style="font-size:12px;color:var(--text2);font-family:var(--mono);">UNIVERSE:</span>
-          <button class="idx-btn active" id="bt-uni-n50"   onclick="switchBtUniverse('NIFTY50')">NIFTY 50</button>
-          <button class="idx-btn"        id="bt-uni-nn50"  onclick="switchBtUniverse('NIFTYNEXT50')">NIFTY NEXT 50</button>
-          <button class="idx-btn"        id="bt-uni-n100"  onclick="switchBtUniverse('NIFTY100')">NIFTY 100</button>
-        </div>
+      <!-- Source toggle -->
+      <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;">
+        <span style="font-size:12px;color:var(--text2);font-family:var(--mono);">DATA SOURCE:</span>
+        <button class="idx-btn active" id="src-dhan" onclick="switchBtSource('dhan')">🔐 Dhan API</button>
+        <button class="idx-btn" id="src-bhavcopy" onclick="switchBtSource('bhavcopy')">📂 NSE Bhavcopy (Free)</button>
       </div>
 
       <!-- ── ROW 1: Credentials + Dates ──────────────────────── -->
@@ -1101,6 +1093,20 @@ const HTML_PAGE = `<!DOCTYPE html>
             <div class="form-hint">14-period RSI — avoids momentum traps</div>
           </div>
 
+          <div>
+            <label class="form-label">Trailing Stop Loss (from peak)</label>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <select class="form-input" id="bt-tsl-mode" onchange="onTslModeChange()" style="font-size:12px;padding:6px 8px;width:90px;">
+                <option value="none">Off</option>
+                <option value="pct">% from peak</option>
+              </select>
+              <input class="form-input" id="bt-tsl-pct" type="number" value="7" min="1" max="50" step="0.5"
+                placeholder="%" style="font-size:12px;width:70px;display:none;" />
+              <span id="bt-tsl-pct-label" style="font-size:12px;color:var(--text2);font-family:var(--mono);display:none;">%</span>
+            </div>
+            <div class="form-hint" id="bt-tsl-hint">Exit if price falls X% from its peak after entry</div>
+          </div>
+
         </div>
       </div>
 
@@ -1185,6 +1191,10 @@ const HTML_PAGE = `<!DOCTYPE html>
               <option value="win">Wins only</option>
               <option value="loss">Losses only</option>
             </select>
+            <button class="btn btn-green" onclick="downloadTradeLogExcel()" id="bt-download-btn"
+              title="Download trade log as Excel">
+              ⬇ Excel
+            </button>
           </div>
         </div>
         <div class="table-wrap">
@@ -1385,17 +1395,9 @@ function switchTab(tab) {
 // ═══════════════════════════════════════════════════════
 //  BACKTEST — Dhan Historical API
 // ═══════════════════════════════════════════════════════
-const state_bt = { trades: [], running: false, startCapital: 400000 };
+const state_bt = { trades: [], running: false };
 
-const state_bt_source   = { current: 'dhan' };
-const state_bt_universe = { current: 'NIFTY50' };
-
-function switchBtUniverse(u) {
-  state_bt_universe.current = u;
-  document.querySelectorAll('#bt-uni-n50,#bt-uni-nn50,#bt-uni-n100').forEach(b => b.classList.remove('active'));
-  const map = { 'NIFTY50': 'bt-uni-n50', 'NIFTYNEXT50': 'bt-uni-nn50', 'NIFTY100': 'bt-uni-n100' };
-  document.getElementById(map[u]).classList.add('active');
-}
+const state_bt_source = { current: 'dhan' };
 
 // ── Risk helpers ─────────────────────────────────────────────────────────────
 function getEffectiveTradeSize() {
@@ -1471,10 +1473,22 @@ function onMaxAvgChange() {
   }
 }
 
+function onTslModeChange() {
+  const mode = document.getElementById('bt-tsl-mode').value;
+  const show = mode !== 'none';
+  document.getElementById('bt-tsl-pct').style.display       = show ? '' : 'none';
+  document.getElementById('bt-tsl-pct-label').style.display = show ? '' : 'none';
+  document.getElementById('bt-tsl-hint').textContent = show
+    ? \`Exit when price falls \${document.getElementById('bt-tsl-pct').value}% from its highest point after entry\`
+    : 'Exit if price falls X% from its peak after entry';
+}
+
 function collectFilters() {
   const maxAvg = parseInt(document.getElementById('bt-max-avg').value);
   const targetInputs = document.querySelectorAll('#bt-targets-container input[data-tidx]');
   const targets = Array.from(targetInputs).map(inp => parseFloat(inp.value) || _DEF[parseInt(inp.dataset.tidx)]);
+  const tslMode = document.getElementById('bt-tsl-mode').value;
+  const tslPct  = tslMode !== 'none' ? (parseFloat(document.getElementById('bt-tsl-pct').value) || 7) : 0;
   return {
     maType:    document.getElementById('bt-ma-type').value,
     maPeriod:  parseInt(document.getElementById('bt-ma-period').value) || 200,
@@ -1483,6 +1497,7 @@ function collectFilters() {
     rsiFilter: document.getElementById('bt-rsi-filter').value,
     maxAvg,
     targets,
+    trailSL: tslPct,   // 0 = off, >0 = trailing SL %
   };
 }
 
@@ -1499,26 +1514,23 @@ function runBacktest() {
   const riskVal  = parseFloat(document.getElementById('bt-risk-value').value);
   const riskPct  = riskMode === 'pct' ? riskVal : (riskVal / capital) * 100;
 
-  const fq = \`&maType=\${filters.maType}&maPeriod=\${filters.maPeriod}&w52filter=\${filters.w52filter}&volFilter=\${filters.volFilter}&rsiFilter=\${filters.rsiFilter}&maxAvg=\${filters.maxAvg}&targets=\${encodeURIComponent(filters.targets.join(','))}&riskPct=\${riskPct}\`;
+  const fq = \`&maType=\${filters.maType}&maPeriod=\${filters.maPeriod}&w52filter=\${filters.w52filter}&volFilter=\${filters.volFilter}&rsiFilter=\${filters.rsiFilter}&maxAvg=\${filters.maxAvg}&targets=\${encodeURIComponent(filters.targets.join(','))}&riskPct=\${riskPct}&trailSL=\${filters.trailSL}\`;
 
   // Also call onMaxAvgChange immediately after load to seed the dynamic rows if not yet rendered
   if (!document.querySelector('#bt-targets-container input')) onMaxAvgChange();
 
-  const universe = state_bt_universe.current;
-  const fqU = fq + \`&universe=\${universe}\`;
   let url;
   if (source === 'dhan') {
     const token    = document.getElementById('bt-token').value.trim();
     const clientId = document.getElementById('bt-client-id').value.trim();
     if (!token || !clientId) return toast('Enter Dhan Client ID and Access Token', 'error');
-    url = \`/api/backtest/run?token=\${encodeURIComponent(token)}&clientId=\${encodeURIComponent(clientId)}&capital=\${capital}&tradeSize=\${tradeSize}&fromDate=\${fromDate}&toDate=\${toDate}\${fqU}\`;
+    url = \`/api/backtest/run?token=\${encodeURIComponent(token)}&clientId=\${encodeURIComponent(clientId)}&capital=\${capital}&tradeSize=\${tradeSize}&fromDate=\${fromDate}&toDate=\${toDate}\${fq}\`;
   } else {
-    url = \`/api/backtest/bhavcopy?capital=\${capital}&tradeSize=\${tradeSize}&fromDate=\${fromDate}&toDate=\${toDate}\${fqU}\`;
+    url = \`/api/backtest/bhavcopy?capital=\${capital}&tradeSize=\${tradeSize}&fromDate=\${fromDate}&toDate=\${toDate}\${fq}\`;
   }
 
-  state_bt.running      = true;
-  state_bt.trades       = [];
-  state_bt.startCapital = capital;
+  state_bt.running = true;
+  state_bt.trades  = [];
   document.getElementById('bt-run-btn').innerHTML = '<span class="spinner"></span> Running...';
   document.getElementById('bt-run-btn').disabled = true;
   document.getElementById('bt-progress-wrap').classList.add('visible');
@@ -1611,11 +1623,6 @@ function renderBtResults(summary, byYear, capital) {
       <div class="stat-label">Open Positions MTM</div>
       <div class="stat-value \${summary.avg_loss >= 0 ? 'green' : 'red'}">\${fmtCurr(summary.avg_loss, 0)}</div>
       <div class="stat-sub">avg open P&L, \${summary.open_trades} positions</div>
-    </div>
-    <div class="stat-card" style="\${summary.min_capital < capital * 0.9 ? 'background:var(--red-bg);border-color:rgba(240,82,82,0.4);' : 'background:var(--green-bg);border-color:rgba(34,217,122,0.3);'}">
-      <div class="stat-label" style="color:\${summary.min_capital < capital * 0.9 ? 'var(--red)' : 'var(--green)'}">⚠️ Lowest Capital</div>
-      <div class="stat-value \${summary.min_capital < capital * 0.9 ? 'red' : 'green'}">\${fmtCurr(summary.min_capital || capital, 0)}</div>
-      <div class="stat-sub">\${summary.min_capital_date ? 'on ' + summary.min_capital_date : 'Capital never dipped'}</div>
     </div>\`;
 
   document.getElementById('bt-year-tbody').innerHTML = Object.entries(byYear).map(([y, v]) => \`
@@ -1734,35 +1741,38 @@ function renderBtAnalysis(summary, byYear, trades, capital, tradeSize, filters) 
     </div>\`;
 }
 
-function renderBtTrades() {
+function getFilteredTrades() {
   const symFilter = document.getElementById('bt-filter-sym').value;
   const resFilter = document.getElementById('bt-filter-result').value;
   let trades = state_bt.trades;
   if (symFilter) trades = trades.filter(t => t.symbol === symFilter);
   if (resFilter === 'win')  trades = trades.filter(t => t.pnl > 0);
   if (resFilter === 'loss') trades = trades.filter(t => t.pnl <= 0);
-  trades = trades.slice().sort((a, b) => new Date(b.entry_date) - new Date(a.entry_date));
+  return trades.slice().sort((a, b) => new Date(b.entry_date) - new Date(a.entry_date));
+}
+
+function renderBtTrades() {
+  const trades   = getFilteredTrades();
+  const startCap = parseFloat(document.getElementById('bt-capital').value) || 400000;
 
   if (!trades.length) {
     document.getElementById('bt-trade-tbody').innerHTML =
-      '<tr class="empty-row"><td colspan="14">No trades match filter</td></tr>';
+      '<tr class="empty-row"><td colspan="15">No trades match filter</td></tr>';
     return;
   }
 
   document.getElementById('bt-trade-tbody').innerHTML = trades.map(t => {
-    const returnPct = t.invested > 0 ? ((t.pnl / t.invested) * 100).toFixed(1) : '—';
+    const returnPct = t.invested > 0 ? ((t.pnl / t.invested) * 100).toFixed(1) : '\u2014';
     const isOpen    = t.exit_reason === 'OPEN';
-    const maxPctStr = (isOpen && t.max_profit_pct != null)
+    const isTSL     = t.exit_reason === 'TSL';
+    const maxPctStr = isOpen && t.max_profit_pct != null
       ? \`<span class="up">+\${t.max_profit_pct.toFixed(1)}%</span>\`
-      : '—';
-    // Capital after: green if grew, red if below start, grey if open
+      : (isTSL && t.tsl_from_peak_pct ? \`<span class="down">-\${t.tsl_from_peak_pct}% from peak</span>\` : '\u2014');
     const capAfter  = t.capital_after;
-    const capStyle  = capAfter == null ? 'color:var(--text3)'
-                    : capAfter >= state_bt.startCapital ? 'color:var(--green);font-weight:700'
-                    : 'color:var(--red);font-weight:700';
-    const capStr    = capAfter == null ? '<span style="color:var(--text3)">Still open</span>'
-                    : \`<span style="\${capStyle}">\${fmtCurr(capAfter, 0)}</span>\`;
-    return \`<tr>
+    const capCell   = capAfter == null
+      ? '<span style="color:var(--text3)">Open</span>'
+      : \`<span style="font-weight:700;color:\${capAfter >= startCap ? 'var(--green)' : 'var(--red)'}">\${fmtCurr(capAfter, 0)}</span>\`;
+    return \`<tr class="\${isTSL ? 'alert-row' : ''}">
       <td><span class="sym-name">\${t.symbol}</span></td>
       <td class="num">\${t.entry_date}</td>
       <td class="num">\${t.exit_date}</td>
@@ -1775,14 +1785,88 @@ function renderBtTrades() {
       <td class="num \${t.pnl >= 0 ? 'up' : 'down'}">\${t.pnl >= 0 ? '+' : ''}\${fmtCurr(t.pnl, 0)}</td>
       <td class="num \${t.pnl >= 0 ? 'up' : 'down'}">\${t.pnl >= 0 ? '+' : ''}\${returnPct}%</td>
       <td class="num">\${maxPctStr}</td>
-      <td class="num">\${capStr}</td>
+      <td class="num">\${capCell}</td>
       <td>
-        \${t.exit_reason === 'TARGET' ? '<span class="badge badge-hit">\ud83c\udfaf TARGET</span>' :
-          isOpen                      ? '<span class="badge badge-open">\ud83d\udcc2 OPEN</span>'   :
-                                        '<span class="badge badge-closed">EXIT</span>'}
+        \${t.exit_reason === 'TARGET' ? '<span class="badge badge-hit">\ud83c\udfaf TARGET</span>'
+          : isTSL                    ? '<span class="badge badge-alert">\ud83d\uded1 TSL</span>'
+          : isOpen                   ? '<span class="badge badge-open">\ud83d\udcc2 OPEN</span>'
+                                     : '<span class="badge badge-closed">EXIT</span>'}
       </td>
     </tr>\`;
   }).join('');
+}
+
+// ── Excel export (SheetJS — lazy loaded on first click) ──────────────────────
+function downloadTradeLogExcel() {
+  const trades = getFilteredTrades();
+  if (!trades.length) { toast('No trades to export', 'error'); return; }
+  if (typeof XLSX !== 'undefined') { _doExcelExport(trades); return; }
+  toast('Loading SheetJS\u2026', 'info', 2000);
+  const sc = document.createElement('script');
+  sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  sc.onload  = () => _doExcelExport(trades);
+  sc.onerror = () => toast('Failed to load SheetJS', 'error');
+  document.head.appendChild(sc);
+}
+
+function _doExcelExport(trades) {
+  const startCap = parseFloat(document.getElementById('bt-capital').value) || 400000;
+
+  // ── Trade Log sheet ───────────────────────────────────────────────────────
+  const rows = trades.map(t => ({
+    'Symbol':              t.symbol,
+    'Entry Date':          t.entry_date,
+    'Exit Date':           t.exit_date,
+    'Entry Price \u20b9':   t.entry_price,
+    'Exit Price \u20b9':    t.exit_price,
+    'Invested \u20b9':      t.invested,
+    'Hold Days':           t.hold_days,
+    'Averages':            t.avg_count,
+    'Target %':            t.target_pct,
+    'P&L \u20b9':           t.pnl,
+    'Return %':            t.invested > 0 ? +((t.pnl / t.invested) * 100).toFixed(2) : 0,
+    'Max Profit % (open)': t.max_profit_pct || '',
+    'TSL Triggered':       t.tsl_triggered ? 'Yes' : 'No',
+    'TSL Drop from Peak %':t.tsl_from_peak_pct || '',
+    'Capital After \u20b9': t.capital_after || '',
+    'Exit Reason':         t.exit_reason,
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{wch:14},{wch:12},{wch:12},{wch:14},{wch:13},{wch:13},
+                 {wch:10},{wch:9},{wch:9},{wch:12},{wch:10},
+                 {wch:20},{wch:14},{wch:20},{wch:16},{wch:12}];
+
+  // ── Summary sheet ─────────────────────────────────────────────────────────
+  const allTrades  = state_bt.trades;
+  const closed     = allTrades.filter(t => t.exit_reason !== 'OPEN');
+  const wins       = closed.filter(t => t.pnl > 0);
+  const tslExits   = closed.filter(t => t.exit_reason === 'TSL');
+  const totalPnl   = allTrades.reduce((s,t) => s + t.pnl, 0);
+
+  const summaryRows = [
+    { 'Metric': 'Starting Capital \u20b9',  'Value': startCap },
+    { 'Metric': 'Final Value \u20b9',        'Value': +(startCap + totalPnl).toFixed(2) },
+    { 'Metric': 'Total P&L \u20b9',          'Value': +totalPnl.toFixed(2) },
+    { 'Metric': 'Total Return %',           'Value': +((totalPnl / startCap) * 100).toFixed(2) },
+    { 'Metric': 'Total Trades',             'Value': allTrades.length },
+    { 'Metric': 'Closed (Target)',          'Value': closed.filter(t=>t.exit_reason==='TARGET').length },
+    { 'Metric': 'Closed (TSL)',             'Value': tslExits.length },
+    { 'Metric': 'Open (MTM)',               'Value': allTrades.filter(t=>t.exit_reason==='OPEN').length },
+    { 'Metric': 'Wins',                     'Value': wins.length },
+    { 'Metric': 'Win Rate %',               'Value': closed.length ? +((wins.length/closed.length)*100).toFixed(2) : 0 },
+    { 'Metric': 'Exported On',              'Value': new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata'}) },
+  ];
+  const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+  wsSummary['!cols'] = [{wch:24},{wch:20}];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Trade Log');
+  XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+
+  const today = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, \`Sharegenius_Backtest_\${today}.xlsx\`);
+  toast('Excel downloaded! \u2713', 'success');
 }
 
 function openModal(id) { document.getElementById(id).classList.add('open'); }
@@ -2705,8 +2789,7 @@ app.delete('/api/positions/:id', async (req, res) => {
 
 // Dhan security IDs for all Nifty 50 stocks (NSE_EQ segment)
 // Source: Dhan securities master + docs
-// ── Nifty 50 security IDs (NSE_EQ segment) ───────────────────────────────────
-const DHAN_NIFTY50_IDS = {
+const DHAN_SECURITY_IDS = {
   'ADANIENT':   '25',     'ADANIPORTS': '15083',  'APOLLOHOSP': '157',
   'ASIANPAINT': '236',    'AXISBANK':   '5900',   'BAJAJ-AUTO': '16675',
   'BAJAJFINSV': '16669',  'BAJFINANCE': '317',    'BHARTIARTL': '10604',
@@ -2724,39 +2807,6 @@ const DHAN_NIFTY50_IDS = {
   'TATAMOTORS': '3456',   'TATASTEEL':  '3499',   'TCS':        '11536',
   'TECHM':      '13538',  'TITAN':      '3506',   'TRENT':      '1964',
   'ULTRACEMCO': '2952',   'WIPRO':      '3787',
-};
-
-// ── Nifty Next 50 security IDs (NSE_EQ segment) ───────────────────────────────
-const DHAN_NEXT50_IDS = {
-  'ABB':        '13',     'ADANIGREEN': '542424', 'ADANIPOWER': '532978',
-  'ALKEM':      '539523', 'AMBUJACEM':  '1270',   'AUROPHARMA': '532',
-  'BAJAJHLDNG': '480',    'BANKBARODA': '532134', 'BEL':        '542726',
-  'BERGEPAINT': '509480', 'BOSCHLTD':   '500530', 'CANBK':      '532483',
-  'CHOLAFIN':   '537875', 'COLPAL':     '510477', 'DLF':        '532868',
-  'GAIL':       '532155', 'GICRE':      '540755', 'GLAND':      '543321',
-  'GODREJCP':   '532424', 'GODREJPROP': '532733', 'HAVELLS':    '517354',
-  'INDHOTEL':   '500850', 'INDIGO':     '539448', 'IRCTC':      '542830',
-  'JINDALSTEL': '532286', 'LTIM':       '540005', 'LUPIN':      '500257',
-  'MCDOWELL-N': '532432', 'MFSL':       '500271', 'NHPC':       '533098',
-  'NMDC':       '526371', 'NYKAA':      '543574', 'OBEROIRLTY': '533273',
-  'OFSS':       '532467', 'PAGEIND':    '532827', 'PERSISTENT': '533179',
-  'PIIND':      '523642', 'PIDILITIND': '500331', 'PNB':        '532461',
-  'RECLTD':     '532955', 'SAIL':       '500113', 'SBICARD':    '543066',
-  'SIEMENS':    '500550', 'SRF':        '503806', 'TATACOMM':   '500483',
-  'TATAPOWER':  '500400', 'TORNTPHARM': '500384', 'TORNTPOWER': '532779',
-  'TVSMOTOR':   '532343', 'UBL':        '532478', 'UNIONBANK':  '532477',
-  'UPL':        '512070', 'VBL':        '544171', 'VEDL':       '500295',
-  'VOLTAS':     '500575', 'ZOMATO':     '543320', 'ZYDUSLIFE':  '539838',
-};
-
-// Combined map — used for lookups by both Dhan and Bhavcopy routes
-const DHAN_SECURITY_IDS = { ...DHAN_NIFTY50_IDS, ...DHAN_NEXT50_IDS };
-
-// Universe selector — maps UI key → symbol list
-const BT_UNIVERSES = {
-  'NIFTY50':    Object.keys(DHAN_NIFTY50_IDS),
-  'NIFTYNEXT50': Object.keys(DHAN_NEXT50_IDS),
-  'NIFTY100':   [...new Set([...Object.keys(DHAN_NIFTY50_IDS), ...Object.keys(DHAN_NEXT50_IDS)])],
 };
 
 async function fetchDhanHistory(securityId, accessToken, fromDate, toDate) {
@@ -2844,13 +2894,15 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
   const { maType = 'none', maPeriod = 200, w52filter = 'none',
           volFilter = 'none', rsiFilter = 'none',
           maxAverages = 3,
-          targetPcts = [0.20, 0.15, 0.10, 0.05] } = opts;
+          targetPcts = [0.20, 0.15, 0.10, 0.05],
+          trailSLPct = 0 } = opts;            // 0 = TSL off
 
   const TOLERANCE     = 0.005;
   const needMA        = maType !== 'none';
   const need52W       = w52filter !== 'none';
   const needVol       = volFilter !== 'none';
   const needRSI       = rsiFilter !== 'none';
+  const needTSL       = trailSLPct > 0;
   const volMult       = parseFloat(volFilter) || 1;
   let   runningCapital = initialCapital;          // compounds as trades close
 
@@ -2879,14 +2931,38 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
       if (today.high >= tgt) {
         const qty = pos.totalInvested / pos.avgPrice;
         const pnl = +((tgt - pos.avgPrice) * qty).toFixed(2);
-        runningCapital += pnl;                    // ← add profit back to capital
+        runningCapital += pnl;
         trades.push({ symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
           exit_date: d, exit_price: +tgt.toFixed(2), invested: +pos.totalInvested.toFixed(2),
           pnl,
           avg_count: pos.avgCount, exit_reason: 'TARGET',
           hold_days: holdDays, target_pct: +(tp * 100).toFixed(1),
-          capital_after: +runningCapital.toFixed(2) });
+          capital_after: +runningCapital.toFixed(2),
+          tsl_triggered: false });
         pos = null; gtt = null; continue;
+      }
+
+      // ── Trailing Stop Loss exit ────────────────────────────────────────────
+      // Only fires after price has risen above entry (protecting profits only).
+      // TSL price = highest intraday high so far × (1 - trailSLPct/100)
+      if (needTSL && pos.maxHigh > pos.avgPrice) {
+        const tslPrice = pos.maxHigh * (1 - trailSLPct / 100);
+        if (today.low <= tslPrice) {
+          // Exit at TSL price (approximate — use open if gap-down)
+          const exitPx = Math.min(today.open, tslPrice);
+          const qty    = pos.totalInvested / pos.avgPrice;
+          const pnl    = +((exitPx - pos.avgPrice) * qty).toFixed(2);
+          runningCapital += pnl;
+          trades.push({ symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
+            exit_date: d, exit_price: +exitPx.toFixed(2), invested: +pos.totalInvested.toFixed(2),
+            pnl,
+            avg_count: pos.avgCount, exit_reason: 'TSL',
+            hold_days: holdDays, target_pct: +(tp * 100).toFixed(1),
+            capital_after: +runningCapital.toFixed(2),
+            tsl_triggered: true,
+            tsl_from_peak_pct: +((pos.maxHigh - exitPx) / pos.maxHigh * 100).toFixed(1) });
+          pos = null; gtt = null; continue;
+        }
       }
 
       if (pos.avgCount < maxAverages) {
@@ -3003,34 +3079,6 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
 }
 
 
-// ── Compute chronological running capital across all trades ──────────────────
-// Sorts closed trades by exit_date, walks cumulative P&L so each trade shows
-// exact capital remaining. Open (MTM) trades show null — capital still deployed.
-function attachCapitalTracking(allTrades, startCapital) {
-  const closed = allTrades
-    .filter(t => t.exit_reason !== 'OPEN')
-    .sort((a, b) => a.exit_date.localeCompare(b.exit_date));
-
-  let running = startCapital;
-  let minCapital = startCapital;
-  let minCapitalDate = '';
-
-  for (const t of closed) {
-    running += t.pnl;
-    t.capital_after = +running.toFixed(2);
-    if (running < minCapital) {
-      minCapital     = running;
-      minCapitalDate = t.exit_date;
-    }
-  }
-
-  for (const t of allTrades) {
-    if (t.exit_reason === 'OPEN') t.capital_after = null;
-  }
-
-  return { minCapital: +minCapital.toFixed(2), minCapitalDate, finalCapital: +running.toFixed(2) };
-}
-
 // SSE backtest runner
 app.get('/api/backtest/run', async (req, res) => {
   const { token, clientId, capital = 400000, tradeSize = 8000,
@@ -3038,13 +3086,14 @@ app.get('/api/backtest/run', async (req, res) => {
           maType = 'none', maPeriod = '200', w52filter = 'none',
           volFilter = 'none', rsiFilter = 'none',
           maxAvg = '3', targets = '20,15,10,8,6,5,4',
-          riskPct = '2', universe = 'NIFTY50' } = req.query;
+          riskPct = '2', trailSL = '0' } = req.query;
 
   const cap         = parseFloat(capital);
   const riskPctNum  = parseFloat(riskPct) || 2;
   const targetPcts  = targets.split(',').map(v => parseFloat(v.trim()) / 100).filter(v => !isNaN(v));
   const maxAverages = parseInt(maxAvg);
-  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts };
+  const trailSLPct  = parseFloat(trailSL) || 0;  // 0 = TSL off
+  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, trailSLPct };
 
   if (!token || !clientId) {
     return res.status(400).json({ error: 'token and clientId required' });
@@ -3057,7 +3106,7 @@ app.get('/api/backtest/run', async (req, res) => {
 
   const send = obj => { res.write('data: ' + JSON.stringify(obj) + '\n\n'); if (res.flush) res.flush(); };
 
-  const symbols = BT_UNIVERSES[universe] || BT_UNIVERSES['NIFTY50'];
+  const symbols = Object.keys(DHAN_SECURITY_IDS);
   const allTrades = [];
   // Fetch data slightly before fromDate for 20-day warmup
   const warmupDate = new Date(fromDate);
@@ -3085,9 +3134,6 @@ app.get('/api/backtest/run', async (req, res) => {
            symbol: sym, status, error, trades });
     await delay(350); // respect Dhan rate limits
   }
-
-  // Attach chronological capital tracking to each trade
-  const capStats = attachCapitalTracking(allTrades, cap);
 
   // Aggregate summary — use compounded P&L for final value
   const closed   = allTrades.filter(t => t.exit_reason !== 'OPEN');
@@ -3133,9 +3179,6 @@ app.get('/api/backtest/run', async (req, res) => {
       avg_loss:      +avgLoss.toFixed(2),
       avg_hold_win:  +avgHoldW.toFixed(1),
       avg_hold_loss: +avgHoldL.toFixed(1),
-      min_capital:   capStats.minCapital,
-      min_capital_date: capStats.minCapitalDate,
-      universe,
     },
     byYear,
   });
@@ -3288,14 +3331,15 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
     maType = 'none', maPeriod = '200', w52filter = 'none',
     volFilter = 'none', rsiFilter = 'none',
     maxAvg = '3', targets = '20,15,10,8,6,5,4',
-    riskPct = '2', universe = 'NIFTY50',
+    riskPct = '2', trailSL = '0',
   } = req.query;
 
   const cap         = parseFloat(capital);
   const riskPctNum  = parseFloat(riskPct) || 2;
   const targetPcts  = targets.split(',').map(v => parseFloat(v.trim()) / 100).filter(v => !isNaN(v));
   const maxAverages = parseInt(maxAvg);
-  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts };
+  const trailSLPct  = parseFloat(trailSL) || 0;
+  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, trailSLPct };
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -3307,7 +3351,7 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
     if (res.flush) res.flush();
   };
 
-  const symSet   = new Set(BT_UNIVERSES[universe] || BT_UNIVERSES['NIFTY50']);
+  const symSet   = new Set(Object.keys(DHAN_SECURITY_IDS));
   const allDays  = getWeekdays(fromDate, toDate);
   const total    = allDays.length;
 
@@ -3369,9 +3413,6 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
     allTrades.push(...result.trades);
   }
 
-  // Attach chronological capital tracking to each trade
-  const capStats = attachCapitalTracking(allTrades, cap);
-
   // Aggregate — compounded P&L
   const closed   = allTrades.filter(t => t.exit_reason !== 'OPEN');
   const open_t   = allTrades.filter(t => t.exit_reason === 'OPEN');
@@ -3418,15 +3459,11 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
       avg_loss:      +avgLoss.toFixed(2),
       avg_hold_win:  +avgHoldW.toFixed(1),
       avg_hold_loss: +avgHoldL.toFixed(1),
-      min_capital:      capStats.minCapital,
-      min_capital_date: capStats.minCapitalDate,
-      universe,
     },
     byYear,
   });
   res.end();
 });
-
 
 // ─────────────────────────────────────────────
 //  HEALTH CHECK
