@@ -1093,18 +1093,39 @@ const HTML_PAGE = `<!DOCTYPE html>
             <div class="form-hint">14-period RSI — avoids momentum traps</div>
           </div>
 
+        </div>
+      </div>
+
+      <!-- ── ROW 3B: Trailing Stop Loss Config ─────────────────────────── -->
+      <div style="background:var(--bg3);border:1px solid rgba(240,82,82,0.25);border-radius:var(--radius2);padding:14px 16px;margin-bottom:12px;">
+        <div style="font-size:12px;font-family:var(--mono);color:var(--red);font-weight:700;letter-spacing:0.5px;margin-bottom:10px;">🛑 TRAILING STOP LOSS — Activates only after target is first reached</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;align-items:start;">
+
           <div>
-            <label class="form-label">Trailing Stop Loss (from peak)</label>
+            <label class="form-label">TSL Mode</label>
+            <select class="form-input" id="bt-tsl-mode" onchange="onTslModeChange()" style="font-size:12px;padding:6px 8px;">
+              <option value="none">Off — exit only at target</option>
+              <option value="on">On — trail after target hit</option>
+            </select>
+            <div class="form-hint">When ON: trade does NOT close at target. Instead a trailing SL is armed.</div>
+          </div>
+
+          <div id="bt-tsl-pct-wrap" style="display:none;">
+            <label class="form-label">TSL % (trail from peak)</label>
             <div style="display:flex;gap:6px;align-items:center;">
-              <select class="form-input" id="bt-tsl-mode" onchange="onTslModeChange()" style="font-size:12px;padding:6px 8px;width:90px;">
-                <option value="none">Off</option>
-                <option value="pct">% from peak</option>
-              </select>
               <input class="form-input" id="bt-tsl-pct" type="number" value="7" min="1" max="50" step="0.5"
-                placeholder="%" style="font-size:12px;width:70px;display:none;" />
-              <span id="bt-tsl-pct-label" style="font-size:12px;color:var(--text2);font-family:var(--mono);display:none;">%</span>
+                style="font-size:13px;font-weight:700;color:var(--red);flex:1;text-align:right;" />
+              <span style="font-size:13px;color:var(--text2);font-family:var(--mono);">%</span>
             </div>
-            <div class="form-hint" id="bt-tsl-hint">Exit if price falls X% from its peak after entry</div>
+            <div class="form-hint" id="bt-tsl-hint">Stop = highest price since target × (1 − 7%)</div>
+          </div>
+
+          <div id="bt-tsl-explainer" style="display:none;font-size:11px;font-family:var(--mono);color:var(--text2);line-height:1.7;padding:10px 12px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border);">
+            <strong style="color:var(--text);">How it works:</strong><br/>
+            1. Stock hits target (e.g. +20%) → trade stays open, TSL armed<br/>
+            2. TSL stop = peak × (1 − TSL%) = 20% × (1−7%) = <span style="color:var(--gold)">+13% locked in</span><br/>
+            3. Stock goes to +28% → TSL stop moves to +28%×(1−7%) = <span style="color:var(--gold)">+21%</span><br/>
+            4. Stock falls to stop → exit, profit locked ✓
           </div>
 
         </div>
@@ -1191,8 +1212,7 @@ const HTML_PAGE = `<!DOCTYPE html>
               <option value="win">Wins only</option>
               <option value="loss">Losses only</option>
             </select>
-            <button class="btn btn-green" onclick="downloadTradeLogExcel()" id="bt-download-btn"
-              title="Download trade log as Excel">
+            <button class="btn btn-green" onclick="downloadTradeLogExcel()" title="Download trade log as Excel">
               ⬇ Excel
             </button>
           </div>
@@ -1212,8 +1232,8 @@ const HTML_PAGE = `<!DOCTYPE html>
                 <th class="num">Target</th>
                 <th class="num">P&amp;L ₹</th>
                 <th class="num">Return%</th>
-                <th class="num">Max%</th>
-                <th class="num" style="color:var(--gold)">Capital After ₹</th>
+                <th class="num">Max% / TSL</th>
+                <th class="num" style="color:var(--gold)">Capital After</th>
                 <th>Result</th>
               </tr>
             </thead>
@@ -1474,21 +1494,24 @@ function onMaxAvgChange() {
 }
 
 function onTslModeChange() {
-  const mode = document.getElementById('bt-tsl-mode').value;
-  const show = mode !== 'none';
-  document.getElementById('bt-tsl-pct').style.display       = show ? '' : 'none';
-  document.getElementById('bt-tsl-pct-label').style.display = show ? '' : 'none';
-  document.getElementById('bt-tsl-hint').textContent = show
-    ? \`Exit when price falls \${document.getElementById('bt-tsl-pct').value}% from its highest point after entry\`
-    : 'Exit if price falls X% from its peak after entry';
+  const on = document.getElementById('bt-tsl-mode').value === 'on';
+  document.getElementById('bt-tsl-pct-wrap').style.display   = on ? '' : 'none';
+  document.getElementById('bt-tsl-explainer').style.display  = on ? '' : 'none';
+  if (on) onTslPctChange();
+}
+
+function onTslPctChange() {
+  const pct = parseFloat(document.getElementById('bt-tsl-pct').value) || 7;
+  document.getElementById('bt-tsl-hint').textContent =
+    'Stop = highest price since target × (1 − ' + pct + '%) → locks in (target − ' + pct + '%) minimum';
 }
 
 function collectFilters() {
   const maxAvg = parseInt(document.getElementById('bt-max-avg').value);
   const targetInputs = document.querySelectorAll('#bt-targets-container input[data-tidx]');
   const targets = Array.from(targetInputs).map(inp => parseFloat(inp.value) || _DEF[parseInt(inp.dataset.tidx)]);
-  const tslMode = document.getElementById('bt-tsl-mode').value;
-  const tslPct  = tslMode !== 'none' ? (parseFloat(document.getElementById('bt-tsl-pct').value) || 7) : 0;
+  const tslOn  = document.getElementById('bt-tsl-mode').value === 'on';
+  const tslPct = tslOn ? (parseFloat(document.getElementById('bt-tsl-pct').value) || 7) : 0;
   return {
     maType:    document.getElementById('bt-ma-type').value,
     maPeriod:  parseInt(document.getElementById('bt-ma-period').value) || 200,
@@ -1497,7 +1520,7 @@ function collectFilters() {
     rsiFilter: document.getElementById('bt-rsi-filter').value,
     maxAvg,
     targets,
-    trailSL: tslPct,   // 0 = off, >0 = trailing SL %
+    trailSL: tslPct,   // 0 = off, >0 = trail % after target hit
   };
 }
 
@@ -1742,13 +1765,13 @@ function renderBtAnalysis(summary, byYear, trades, capital, tradeSize, filters) 
 }
 
 function getFilteredTrades() {
-  const symFilter = document.getElementById('bt-filter-sym').value;
-  const resFilter = document.getElementById('bt-filter-result').value;
-  let trades = state_bt.trades;
-  if (symFilter) trades = trades.filter(t => t.symbol === symFilter);
-  if (resFilter === 'win')  trades = trades.filter(t => t.pnl > 0);
-  if (resFilter === 'loss') trades = trades.filter(t => t.pnl <= 0);
-  return trades.slice().sort((a, b) => new Date(b.entry_date) - new Date(a.entry_date));
+  const sym = document.getElementById('bt-filter-sym').value;
+  const res = document.getElementById('bt-filter-result').value;
+  let t = state_bt.trades;
+  if (sym) t = t.filter(x => x.symbol === sym);
+  if (res === 'win')  t = t.filter(x => x.pnl > 0);
+  if (res === 'loss') t = t.filter(x => x.pnl <= 0);
+  return t.slice().sort((a, b) => new Date(b.entry_date) - new Date(a.entry_date));
 }
 
 function renderBtTrades() {
@@ -1765,13 +1788,26 @@ function renderBtTrades() {
     const returnPct = t.invested > 0 ? ((t.pnl / t.invested) * 100).toFixed(1) : '\u2014';
     const isOpen    = t.exit_reason === 'OPEN';
     const isTSL     = t.exit_reason === 'TSL';
-    const maxPctStr = isOpen && t.max_profit_pct != null
-      ? \`<span class="up">+\${t.max_profit_pct.toFixed(1)}%</span>\`
-      : (isTSL && t.tsl_from_peak_pct ? \`<span class="down">-\${t.tsl_from_peak_pct}% from peak</span>\` : '\u2014');
-    const capAfter  = t.capital_after;
-    const capCell   = capAfter == null
+
+    // Max% column — for TSL exits show locked-in profit; for open+armed show live TSL stop
+    let maxCell;
+    if (isTSL) {
+      maxCell = \`<span class="up">+\${t.profit_locked_pct}%</span> <span style="font-size:10px;color:var(--text3)">(floor +\${t.tsl_floor_pct}%)</span>\`;
+    } else if (isOpen && t.tsl_armed) {
+      const stopStr = t.tsl_current_stop ? \` @ \u20b9\${t.tsl_current_stop.toLocaleString('en-IN')}\` : '';
+      maxCell = \`<span style="color:var(--gold);font-size:10px;font-family:var(--mono)">TSL ARMED\${stopStr}</span>\`;
+    } else if (isOpen && t.max_profit_pct) {
+      maxCell = \`<span class="up">+\${t.max_profit_pct}%</span>\`;
+    } else {
+      maxCell = '\u2014';
+    }
+
+    // Capital after column
+    const capAfter = t.capital_after;
+    const capCell  = capAfter == null
       ? '<span style="color:var(--text3)">Open</span>'
       : \`<span style="font-weight:700;color:\${capAfter >= startCap ? 'var(--green)' : 'var(--red)'}">\${fmtCurr(capAfter, 0)}</span>\`;
+
     return \`<tr class="\${isTSL ? 'alert-row' : ''}">
       <td><span class="sym-name">\${t.symbol}</span></td>
       <td class="num">\${t.entry_date}</td>
@@ -1784,7 +1820,7 @@ function renderBtTrades() {
       <td class="num" style="color:var(--gold)">\${t.target_pct}%</td>
       <td class="num \${t.pnl >= 0 ? 'up' : 'down'}">\${t.pnl >= 0 ? '+' : ''}\${fmtCurr(t.pnl, 0)}</td>
       <td class="num \${t.pnl >= 0 ? 'up' : 'down'}">\${t.pnl >= 0 ? '+' : ''}\${returnPct}%</td>
-      <td class="num">\${maxPctStr}</td>
+      <td class="num">\${maxCell}</td>
       <td class="num">\${capCell}</td>
       <td>
         \${t.exit_reason === 'TARGET' ? '<span class="badge badge-hit">\ud83c\udfaf TARGET</span>'
@@ -1796,7 +1832,7 @@ function renderBtTrades() {
   }).join('');
 }
 
-// ── Excel export (SheetJS — lazy loaded on first click) ──────────────────────
+// ── Excel export ─────────────────────────────────────────────────────────────
 function downloadTradeLogExcel() {
   const trades = getFilteredTrades();
   if (!trades.length) { toast('No trades to export', 'error'); return; }
@@ -1811,62 +1847,62 @@ function downloadTradeLogExcel() {
 
 function _doExcelExport(trades) {
   const startCap = parseFloat(document.getElementById('bt-capital').value) || 400000;
-
-  // ── Trade Log sheet ───────────────────────────────────────────────────────
   const rows = trades.map(t => ({
-    'Symbol':              t.symbol,
-    'Entry Date':          t.entry_date,
-    'Exit Date':           t.exit_date,
-    'Entry Price \u20b9':   t.entry_price,
-    'Exit Price \u20b9':    t.exit_price,
-    'Invested \u20b9':      t.invested,
-    'Hold Days':           t.hold_days,
-    'Averages':            t.avg_count,
-    'Target %':            t.target_pct,
-    'P&L \u20b9':           t.pnl,
-    'Return %':            t.invested > 0 ? +((t.pnl / t.invested) * 100).toFixed(2) : 0,
-    'Max Profit % (open)': t.max_profit_pct || '',
-    'TSL Triggered':       t.tsl_triggered ? 'Yes' : 'No',
-    'TSL Drop from Peak %':t.tsl_from_peak_pct || '',
-    'Capital After \u20b9': t.capital_after || '',
-    'Exit Reason':         t.exit_reason,
+    'Symbol':               t.symbol,
+    'Entry Date':           t.entry_date,
+    'Exit Date':            t.exit_date,
+    'Entry Price \u20b9':    t.entry_price,
+    'Exit Price \u20b9':     t.exit_price,
+    'Invested \u20b9':       t.invested,
+    'Hold Days':            t.hold_days,
+    'Averages':             t.avg_count,
+    'Target %':             t.target_pct,
+    'P&L \u20b9':            t.pnl,
+    'Return %':             t.invested > 0 ? +((t.pnl/t.invested)*100).toFixed(2) : 0,
+    'Max Profit % at exit': t.max_profit_pct || '',
+    'TSL Armed':            t.tsl_armed ? 'Yes' : '',
+    'TSL Floor % (min profit locked)': t.tsl_floor_pct || '',
+    'TSL Profit Locked %':  t.profit_locked_pct || '',
+    'Capital After \u20b9':  t.capital_after || '',
+    'Exit Reason':          t.exit_reason,
   }));
 
   const ws = XLSX.utils.json_to_sheet(rows);
-  ws['!cols'] = [{wch:14},{wch:12},{wch:12},{wch:14},{wch:13},{wch:13},
-                 {wch:10},{wch:9},{wch:9},{wch:12},{wch:10},
-                 {wch:20},{wch:14},{wch:20},{wch:16},{wch:12}];
+  ws['!cols'] = [
+    {wch:14},{wch:12},{wch:12},{wch:14},{wch:13},{wch:13},
+    {wch:10},{wch:9},{wch:9},{wch:12},{wch:10},
+    {wch:20},{wch:12},{wch:28},{wch:20},{wch:16},{wch:12},
+  ];
 
-  // ── Summary sheet ─────────────────────────────────────────────────────────
-  const allTrades  = state_bt.trades;
-  const closed     = allTrades.filter(t => t.exit_reason !== 'OPEN');
-  const wins       = closed.filter(t => t.pnl > 0);
-  const tslExits   = closed.filter(t => t.exit_reason === 'TSL');
-  const totalPnl   = allTrades.reduce((s,t) => s + t.pnl, 0);
+  const allTrades = state_bt.trades;
+  const closed    = allTrades.filter(t => t.exit_reason !== 'OPEN');
+  const wins      = closed.filter(t => t.pnl > 0);
+  const tslExits  = closed.filter(t => t.exit_reason === 'TSL');
+  const totalPnl  = allTrades.reduce((s,t) => s+t.pnl, 0);
+  const tslPct    = document.getElementById('bt-tsl-mode').value === 'on'
+    ? (parseFloat(document.getElementById('bt-tsl-pct').value) || 7) : 0;
 
   const summaryRows = [
-    { 'Metric': 'Starting Capital \u20b9',  'Value': startCap },
-    { 'Metric': 'Final Value \u20b9',        'Value': +(startCap + totalPnl).toFixed(2) },
-    { 'Metric': 'Total P&L \u20b9',          'Value': +totalPnl.toFixed(2) },
-    { 'Metric': 'Total Return %',           'Value': +((totalPnl / startCap) * 100).toFixed(2) },
-    { 'Metric': 'Total Trades',             'Value': allTrades.length },
-    { 'Metric': 'Closed (Target)',          'Value': closed.filter(t=>t.exit_reason==='TARGET').length },
-    { 'Metric': 'Closed (TSL)',             'Value': tslExits.length },
-    { 'Metric': 'Open (MTM)',               'Value': allTrades.filter(t=>t.exit_reason==='OPEN').length },
-    { 'Metric': 'Wins',                     'Value': wins.length },
-    { 'Metric': 'Win Rate %',               'Value': closed.length ? +((wins.length/closed.length)*100).toFixed(2) : 0 },
-    { 'Metric': 'Exported On',              'Value': new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata'}) },
+    { Metric: 'Starting Capital \u20b9', Value: startCap },
+    { Metric: 'Final Value \u20b9',      Value: +(startCap + totalPnl).toFixed(2) },
+    { Metric: 'Total P&L \u20b9',        Value: +totalPnl.toFixed(2) },
+    { Metric: 'Total Return %',         Value: +((totalPnl/startCap)*100).toFixed(2) },
+    { Metric: 'Total Trades',           Value: allTrades.length },
+    { Metric: 'Target Exits',           Value: closed.filter(t=>t.exit_reason==='TARGET').length },
+    { Metric: 'TSL Exits',              Value: tslExits.length },
+    { Metric: 'Open MTM',               Value: allTrades.filter(t=>t.exit_reason==='OPEN').length },
+    { Metric: 'Win Rate %',             Value: closed.length ? +((wins.length/closed.length)*100).toFixed(2) : 0 },
+    { Metric: 'TSL % setting',          Value: tslPct || 'Off' },
+    { Metric: 'Exported',               Value: new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata'}) },
   ];
   const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
-  wsSummary['!cols'] = [{wch:24},{wch:20}];
+  wsSummary['!cols'] = [{wch:26},{wch:20}];
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Trade Log');
   XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
-
-  const today = new Date().toISOString().slice(0, 10);
-  XLSX.writeFile(wb, \`Sharegenius_Backtest_\${today}.xlsx\`);
-  toast('Excel downloaded! \u2713', 'success');
+  XLSX.writeFile(wb, \`Sharegenius_Backtest_\${new Date().toISOString().slice(0,10)}.xlsx\`);
+  toast('Excel downloaded \u2713', 'success');
 }
 
 function openModal(id) { document.getElementById(id).classList.add('open'); }
@@ -2895,21 +2931,20 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
           volFilter = 'none', rsiFilter = 'none',
           maxAverages = 3,
           targetPcts = [0.20, 0.15, 0.10, 0.05],
-          trailSLPct = 0 } = opts;            // 0 = TSL off
+          trailSLPct = 0 } = opts;   // 0 = TSL off
 
-  const TOLERANCE     = 0.005;
-  const needMA        = maType !== 'none';
-  const need52W       = w52filter !== 'none';
-  const needVol       = volFilter !== 'none';
-  const needRSI       = rsiFilter !== 'none';
-  const needTSL       = trailSLPct > 0;
-  const volMult       = parseFloat(volFilter) || 1;
-  let   runningCapital = initialCapital;          // compounds as trades close
+  const TOLERANCE      = 0.005;
+  const needMA         = maType !== 'none';
+  const need52W        = w52filter !== 'none';
+  const needVol        = volFilter !== 'none';
+  const needRSI        = rsiFilter !== 'none';
+  const needTSL        = trailSLPct > 0;
+  const volMult        = parseFloat(volFilter) || 1;
+  let   runningCapital = initialCapital;
 
   const trades = [];
   let pos = null, gtt = null;
 
-  // Warmup: need enough rows for longest indicator
   const warmup = Math.max(20, needMA ? maPeriod + 5 : 0, need52W ? 252 : 0, needRSI ? 20 : 0);
 
   for (let i = warmup; i < rows.length; i++) {
@@ -2921,48 +2956,93 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
     if (d < fromDate) continue;
 
     if (pos !== null) {
-      // Track maximum high price achieved while position is open
+      // Always track the running peak for TSL
       if (today.high > pos.maxHigh) pos.maxHigh = today.high;
 
-      const tp  = targetPcts[Math.min(pos.avgCount, targetPcts.length - 1)];
-      const tgt = pos.avgPrice * (1 + tp);
+      const tp       = targetPcts[Math.min(pos.avgCount, targetPcts.length - 1)];
+      const tgt      = pos.avgPrice * (1 + tp);
       const holdDays = Math.round((new Date(d) - new Date(pos.entryDate)) / 86400000);
 
+      // ── Path A: TSL is ON ────────────────────────────────────────────────
+      if (needTSL) {
+
+        // A1: TSL already armed (target was previously reached) → check for stop hit
+        if (pos.tslArmed) {
+          // Peak is tracked from the moment TSL was armed
+          if (today.high > pos.tslPeak) pos.tslPeak = today.high;
+          const stopPrice = pos.tslPeak * (1 - trailSLPct / 100);
+
+          if (today.low <= stopPrice) {
+            // Exit at stop price (use open if there is a gap-down below stop)
+            const exitPx = Math.min(today.open, stopPrice);
+            const qty    = pos.totalInvested / pos.avgPrice;
+            const pnl    = +((exitPx - pos.avgPrice) * qty).toFixed(2);
+            runningCapital += pnl;
+            trades.push({
+              symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
+              exit_date: d, exit_price: +exitPx.toFixed(2),
+              invested: +pos.totalInvested.toFixed(2), pnl,
+              avg_count: pos.avgCount, exit_reason: 'TSL',
+              hold_days: holdDays, target_pct: +(tp * 100).toFixed(1),
+              capital_after: +runningCapital.toFixed(2),
+              tsl_pct: trailSLPct,
+              // Profit locked in = (exitPx - entry) / entry
+              profit_locked_pct: +((exitPx - pos.avgPrice) / pos.avgPrice * 100).toFixed(2),
+              // The initial floor that was set when target was first hit
+              tsl_floor_pct: +(pos.tslFloorPct).toFixed(2),
+            });
+            pos = null; gtt = null; continue;
+          }
+          // TSL armed — no averaging, just wait
+          continue;
+        }
+
+        // A2: TSL not yet armed — check if target just reached today
+        if (today.high >= tgt) {
+          // Arm TSL: start trailing from today's high
+          pos.tslArmed    = true;
+          pos.tslPeak     = today.high;
+          // Floor locked in = target% − TSL%  (can never exit below this profit)
+          pos.tslFloorPct = tp * 100 - trailSLPct;
+          // Don't exit — continue to next day
+          continue;
+        }
+
+        // A3: Target not yet reached — allow averaging as normal
+        if (pos.avgCount < maxAverages) {
+          const atLow = Math.abs(today.low - low20) / low20 <= TOLERANCE;
+          if (atLow) gtt = { trigger: high20, avg: true };
+        }
+        if (gtt && gtt.avg) {
+          gtt.trigger = high20;
+          if (today.high >= gtt.trigger) {
+            const ap        = gtt.trigger;
+            const tradeSize = runningCapital * (riskPct / 100);
+            const oldQty    = pos.totalInvested / pos.avgPrice;
+            const newQty    = tradeSize / ap;
+            pos.avgCount++;
+            pos.avgPrice      = (pos.totalInvested + tradeSize) / (oldQty + newQty);
+            pos.totalInvested += tradeSize;
+            gtt = null;
+          }
+        }
+        continue;
+      }
+
+      // ── Path B: TSL is OFF — exit at target price (original behaviour) ───
       if (today.high >= tgt) {
         const qty = pos.totalInvested / pos.avgPrice;
         const pnl = +((tgt - pos.avgPrice) * qty).toFixed(2);
         runningCapital += pnl;
-        trades.push({ symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
-          exit_date: d, exit_price: +tgt.toFixed(2), invested: +pos.totalInvested.toFixed(2),
-          pnl,
+        trades.push({
+          symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
+          exit_date: d, exit_price: +tgt.toFixed(2),
+          invested: +pos.totalInvested.toFixed(2), pnl,
           avg_count: pos.avgCount, exit_reason: 'TARGET',
           hold_days: holdDays, target_pct: +(tp * 100).toFixed(1),
           capital_after: +runningCapital.toFixed(2),
-          tsl_triggered: false });
+        });
         pos = null; gtt = null; continue;
-      }
-
-      // ── Trailing Stop Loss exit ────────────────────────────────────────────
-      // Only fires after price has risen above entry (protecting profits only).
-      // TSL price = highest intraday high so far × (1 - trailSLPct/100)
-      if (needTSL && pos.maxHigh > pos.avgPrice) {
-        const tslPrice = pos.maxHigh * (1 - trailSLPct / 100);
-        if (today.low <= tslPrice) {
-          // Exit at TSL price (approximate — use open if gap-down)
-          const exitPx = Math.min(today.open, tslPrice);
-          const qty    = pos.totalInvested / pos.avgPrice;
-          const pnl    = +((exitPx - pos.avgPrice) * qty).toFixed(2);
-          runningCapital += pnl;
-          trades.push({ symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
-            exit_date: d, exit_price: +exitPx.toFixed(2), invested: +pos.totalInvested.toFixed(2),
-            pnl,
-            avg_count: pos.avgCount, exit_reason: 'TSL',
-            hold_days: holdDays, target_pct: +(tp * 100).toFixed(1),
-            capital_after: +runningCapital.toFixed(2),
-            tsl_triggered: true,
-            tsl_from_peak_pct: +((pos.maxHigh - exitPx) / pos.maxHigh * 100).toFixed(1) });
-          pos = null; gtt = null; continue;
-        }
       }
 
       if (pos.avgCount < maxAverages) {
@@ -2972,10 +3052,10 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
       if (gtt && gtt.avg) {
         gtt.trigger = high20;
         if (today.high >= gtt.trigger) {
-          const ap     = gtt.trigger;
-          const tradeSize = runningCapital * (riskPct / 100);  // dynamic avg size
-          const oldQty = pos.totalInvested / pos.avgPrice;
-          const newQty = tradeSize / ap;
+          const ap        = gtt.trigger;
+          const tradeSize = runningCapital * (riskPct / 100);
+          const oldQty    = pos.totalInvested / pos.avgPrice;
+          const newQty    = tradeSize / ap;
           pos.avgCount++;
           pos.avgPrice      = (pos.totalInvested + tradeSize) / (oldQty + newQty);
           pos.totalInvested += tradeSize;
@@ -3012,10 +3092,11 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
           }
         }
         if (!blocked) {
-          const tradeSize = runningCapital * (riskPct / 100);  // dynamic entry size
+          const tradeSize = runningCapital * (riskPct / 100);
           pos = { entryDate: d, avgPrice: gtt.trigger,
                   totalInvested: tradeSize, avgCount: 0,
-                  maxHigh: gtt.trigger };
+                  maxHigh: gtt.trigger,
+                  tslArmed: false, tslPeak: gtt.trigger, tslFloorPct: 0 };
           gtt = null;
           continue;
         }
@@ -3059,20 +3140,30 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
   }
 
   if (pos) {
-    const last = rows[rows.length - 1];
-    const ep   = last.close;
-    const qty  = pos.totalInvested / pos.avgPrice;
-    const tp   = targetPcts[Math.min(pos.avgCount, targetPcts.length - 1)];
+    const last     = rows[rows.length - 1];
+    const ep       = last.close;
+    const qty      = pos.totalInvested / pos.avgPrice;
+    const tp       = targetPcts[Math.min(pos.avgCount, targetPcts.length - 1)];
     const holdDays = Math.round((new Date(last.date) - new Date(pos.entryDate)) / 86400000);
     const maxProfitPct = pos.maxHigh > pos.avgPrice
       ? +((pos.maxHigh - pos.avgPrice) / pos.avgPrice * 100).toFixed(2)
       : 0;
-    trades.push({ symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
-      exit_date: last.date, exit_price: +ep.toFixed(2), invested: +pos.totalInvested.toFixed(2),
+    // If TSL is armed, show the current trailing stop price
+    const currentStop = (needTSL && pos.tslArmed)
+      ? +(pos.tslPeak * (1 - trailSLPct / 100)).toFixed(2)
+      : null;
+    trades.push({
+      symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
+      exit_date: last.date, exit_price: +ep.toFixed(2),
+      invested: +pos.totalInvested.toFixed(2),
       pnl: +((ep - pos.avgPrice) * qty).toFixed(2),
       avg_count: pos.avgCount, exit_reason: 'OPEN',
       hold_days: holdDays, target_pct: +(tp * 100).toFixed(1),
-      max_profit_pct: maxProfitPct });
+      max_profit_pct: maxProfitPct,
+      tsl_armed: pos.tslArmed || false,
+      tsl_current_stop: currentStop,
+      tsl_floor_pct: pos.tslFloorPct || 0,
+    });
   }
 
   return { trades, finalCapital: runningCapital };
@@ -3092,7 +3183,7 @@ app.get('/api/backtest/run', async (req, res) => {
   const riskPctNum  = parseFloat(riskPct) || 2;
   const targetPcts  = targets.split(',').map(v => parseFloat(v.trim()) / 100).filter(v => !isNaN(v));
   const maxAverages = parseInt(maxAvg);
-  const trailSLPct  = parseFloat(trailSL) || 0;  // 0 = TSL off
+  const trailSLPct  = Math.max(0, parseFloat(trailSL) || 0);
   const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, trailSLPct };
 
   if (!token || !clientId) {
@@ -3338,7 +3429,7 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
   const riskPctNum  = parseFloat(riskPct) || 2;
   const targetPcts  = targets.split(',').map(v => parseFloat(v.trim()) / 100).filter(v => !isNaN(v));
   const maxAverages = parseInt(maxAvg);
-  const trailSLPct  = parseFloat(trailSL) || 0;
+  const trailSLPct  = Math.max(0, parseFloat(trailSL) || 0);
   const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, trailSLPct };
 
   res.setHeader('Content-Type', 'text/event-stream');
