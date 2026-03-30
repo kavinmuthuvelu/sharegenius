@@ -2946,8 +2946,10 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
     if (d < fromDate) continue;
 
     if (pos !== null) {
-      // Track maximum high price achieved while position is open
+      // Track all-time high (for retrospective target check after averaging)
       if (today.high > pos.maxHigh) pos.maxHigh = today.high;
+      // Also track high since last average (true post-average peak for reporting)
+      if (today.high > pos.maxHighAfterAvg) pos.maxHighAfterAvg = today.high;
 
       const tp  = targetPcts[Math.min(pos.avgCount, targetPcts.length - 1)];
       const tgt = pos.avgPrice * (1 + tp);
@@ -2973,14 +2975,37 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
       if (gtt && gtt.avg) {
         gtt.trigger = high20;
         if (today.high >= gtt.trigger) {
-          const ap     = gtt.trigger;
-          const tradeSize = runningCapital * (riskPct / 100);  // dynamic avg size
-          const oldQty = pos.totalInvested / pos.avgPrice;
-          const newQty = tradeSize / ap;
+          const ap        = gtt.trigger;
+          const tradeSize = runningCapital * (riskPct / 100);
+          const oldQty    = pos.totalInvested / pos.avgPrice;
+          const newQty    = tradeSize / ap;
           pos.avgCount++;
           pos.avgPrice      = (pos.totalInvested + tradeSize) / (oldQty + newQty);
           pos.totalInvested += tradeSize;
+          // Reset maxHighAfterAvg so maxProfitPct only reflects post-average peak
+          pos.maxHighAfterAvg = ap;
           gtt = null;
+
+          // ── FIX: After averaging, the new (lower) target may already be
+          //    surpassed by a historical high. If pos.maxHigh (all-time high
+          //    since entry) >= newTarget, the stock already crossed that price
+          //    while we were holding → exit immediately at newTarget. ──────────
+          const newTp  = targetPcts[Math.min(pos.avgCount, targetPcts.length - 1)];
+          const newTgt = pos.avgPrice * (1 + newTp);
+          if (pos.maxHigh >= newTgt) {
+            const qty2 = pos.totalInvested / pos.avgPrice;
+            const pnl2 = +((newTgt - pos.avgPrice) * qty2).toFixed(2);
+            runningCapital += pnl2;
+            trades.push({
+              symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
+              exit_date: d, exit_price: +newTgt.toFixed(2),
+              invested: +pos.totalInvested.toFixed(2), pnl: pnl2,
+              avg_count: pos.avgCount, exit_reason: 'TARGET',
+              hold_days: holdDays, target_pct: +(newTp * 100).toFixed(1),
+              capital_after: +runningCapital.toFixed(2),
+            });
+            pos = null; gtt = null; continue;
+          }
         }
       }
       continue;
@@ -3016,7 +3041,8 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
           const tradeSize = runningCapital * (riskPct / 100);  // dynamic entry size
           pos = { entryDate: d, avgPrice: gtt.trigger,
                   totalInvested: tradeSize, avgCount: 0,
-                  maxHigh: gtt.trigger };
+                  maxHigh: gtt.trigger,
+                  maxHighAfterAvg: gtt.trigger };  // resets on each average
           gtt = null;
           continue;
         }
@@ -3065,8 +3091,11 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
     const qty  = pos.totalInvested / pos.avgPrice;
     const tp   = targetPcts[Math.min(pos.avgCount, targetPcts.length - 1)];
     const holdDays = Math.round((new Date(last.date) - new Date(pos.entryDate)) / 86400000);
-    const maxProfitPct = pos.maxHigh > pos.avgPrice
-      ? +((pos.maxHigh - pos.avgPrice) / pos.avgPrice * 100).toFixed(2)
+    // Use maxHighAfterAvg (reset on each average) for an accurate
+    // post-average peak % — avoids inflating the figure with pre-average highs
+    const peakForReport = pos.maxHighAfterAvg || pos.maxHigh;
+    const maxProfitPct  = peakForReport > pos.avgPrice
+      ? +((peakForReport - pos.avgPrice) / pos.avgPrice * 100).toFixed(2)
       : 0;
     trades.push({ symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
       exit_date: last.date, exit_price: +ep.toFixed(2), invested: +pos.totalInvested.toFixed(2),
