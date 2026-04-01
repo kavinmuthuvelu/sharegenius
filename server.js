@@ -1805,30 +1805,39 @@ function downloadTradeLogExcel() {
 function _doExcelExport(trades) {
   const startCap = state_bt.startCapital || 400000;
 
-  // Trade Log sheet
-  const rows = trades.map(t => ({
-    'Symbol':            t.symbol,
-    'Entry Date':        t.entry_date,
-    'Exit Date':         t.exit_date,
-    'Entry Price \u20b9': t.entry_price,
-    'Exit Price \u20b9':  t.exit_price,
-    'Invested \u20b9':    t.invested,
-    'Hold Days':         t.hold_days,
-    'Averages':          t.avg_count,
-    'Target %':          t.target_pct,
-    'P&L \u20b9':         t.pnl,
-    'Return %':          t.invested > 0 ? +((t.pnl / t.invested) * 100).toFixed(2) : 0,
-    'Max Profit % (open)': t.max_profit_pct || '',
-    'Capital After \u20b9': t.capital_after != null ? t.capital_after : '',
-    'Exit Reason':       t.exit_reason,
-  }));
+  // Trade Log sheet — detect max averaging depth across all trades
+  const maxAvgDepth = trades.reduce((m, t) => Math.max(m, t.avg_count || 0), 0);
+
+  const rows = trades.map(t => {
+    const base = {
+      'Symbol':             t.symbol,
+      'Entry Date':         t.entry_date,
+      'Entry Price \u20b9': t.entry_price,
+    };
+    // One pair of columns per averaging level, right after entry
+    for (let n = 0; n < maxAvgDepth; n++) {
+      base[\`Avg \${n+1} Date\`]         = t[\`avg_\${n}_date\`]  || '';
+      base[\`Avg \${n+1} Price \u20b9\`] = t[\`avg_\${n}_price\`] || '';
+    }
+    base['Exit Date']              = t.exit_date;
+    base['Exit Price \u20b9']      = t.exit_price;
+    base['Invested \u20b9']        = t.invested;
+    base['Hold Days']              = t.hold_days;
+    base['Averages']               = t.avg_count;
+    base['Target %']               = t.target_pct;
+    base['P&L \u20b9']             = t.pnl;
+    base['Return %']               = t.invested > 0 ? +((t.pnl / t.invested) * 100).toFixed(2) : 0;
+    base['Max Profit % (open)']    = t.max_profit_pct || '';
+    base['Capital After \u20b9']   = t.capital_after != null ? t.capital_after : '';
+    base['Exit Reason']            = t.exit_reason;
+    return base;
+  });
 
   const ws = XLSX.utils.json_to_sheet(rows);
-  ws['!cols'] = [
-    {wch:14},{wch:12},{wch:12},{wch:14},{wch:13},
-    {wch:13},{wch:10},{wch:9},{wch:9},{wch:12},
-    {wch:10},{wch:20},{wch:16},{wch:12},
-  ];
+  const fixedLeft  = [{wch:14},{wch:12},{wch:14}];
+  const avgCols    = Array.from({length: maxAvgDepth}, () => [{wch:12},{wch:14}]).flat();
+  const fixedRight = [{wch:12},{wch:13},{wch:13},{wch:10},{wch:9},{wch:9},{wch:12},{wch:10},{wch:20},{wch:16},{wch:12}];
+  ws['!cols'] = [...fixedLeft, ...avgCols, ...fixedRight];
 
   // Summary sheet
   const allT    = state_bt.trades;
@@ -2917,6 +2926,17 @@ function calcAvgVolume(rows, period, i) {
   return sum / period;
 }
 
+// Spread avg array into flat fields: avg_0_date, avg_0_price, avg_1_date, ...
+function spreadAvgs(avgs) {
+  const out = {};
+  if (!avgs) return out;
+  avgs.forEach((a, i) => {
+    out[`avg_${i}_date`]  = a.date;
+    out[`avg_${i}_price`] = +a.price.toFixed(2);
+  });
+  return out;
+}
+
 function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, opts = {}) {
   const { maType = 'none', maPeriod = 200, w52filter = 'none',
           volFilter = 'none', rsiFilter = 'none',
@@ -2964,7 +2984,8 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
           pnl,
           avg_count: pos.avgCount, exit_reason: 'TARGET',
           hold_days: holdDays, target_pct: +(tp * 100).toFixed(1),
-          capital_after: +runningCapital.toFixed(2) });
+          capital_after: +runningCapital.toFixed(2),
+          ...spreadAvgs(pos.avgs) });
         pos = null; gtt = null; continue;
       }
 
@@ -2984,6 +3005,8 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
           pos.avgCount++;
           pos.avgPrice      = (pos.totalInvested + tradeSize) / (oldQty + newQty);
           pos.totalInvested += tradeSize;
+          // Record this average's date and fill price for reporting
+          pos.avgs.push({ date: d, price: ap });
           // Reset maxHighAfterAvg so maxProfitPct only reflects post-average peak
           pos.maxHighAfterAvg = ap;
           pos.lastAvgIdx      = i;  // remember which row this average fired on
@@ -3033,6 +3056,7 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
               avg_count: pos.avgCount, exit_reason: 'TARGET',
               hold_days: exitHold, target_pct: +(newTp * 100).toFixed(1),
               capital_after: +runningCapital.toFixed(2),
+              ...spreadAvgs(pos.avgs),
             });
             pos = null; gtt = null; continue;
           }
@@ -3077,7 +3101,8 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
                   totalInvested: tradeSize, avgCount: 0,
                   maxHigh: fillPrice,
                   maxHighAfterAvg: fillPrice,   // resets on each average
-                  lastAvgIdx: i };              // row index of last buy/avg
+                  lastAvgIdx: i,                // row index of last buy/avg
+                  avgs: [] };                   // [{date, price}] for each average-down
           gtt = null;
           continue;
         }
@@ -3137,7 +3162,8 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
       pnl: +((ep - pos.avgPrice) * qty).toFixed(2),
       avg_count: pos.avgCount, exit_reason: 'OPEN',
       hold_days: holdDays, target_pct: +(tp * 100).toFixed(1),
-      max_profit_pct: maxProfitPct });
+      max_profit_pct: maxProfitPct,
+      ...spreadAvgs(pos.avgs) });
   }
 
   return { trades, finalCapital: runningCapital };
