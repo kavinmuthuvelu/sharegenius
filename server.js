@@ -1120,6 +1120,14 @@ const HTML_PAGE = `<!DOCTYPE html>
             </select>
             <div class="form-hint">Max times to average down per trade</div>
           </div>
+          <div style="min-width:260px;">
+            <label class="form-label">Averaging Mode</label>
+            <select class="form-input" id="bt-avg-mode" style="font-size:12px;padding:6px 8px;">
+              <option value="native">Native — average on any new 20D low</option>
+              <option value="below_entry">Below entry only — average only if trigger &lt; initial buy price</option>
+            </select>
+            <div class="form-hint" id="bt-avg-mode-hint">Current: average whenever a new 20D low signal fires</div>
+          </div>
           <div style="font-size:11px;font-family:var(--mono);color:var(--text3);line-height:1.6;padding-bottom:20px;">
             Each row below is the <strong style="color:var(--text2)">exit target %</strong> for that holding state.<br/>
             Lower targets after averaging reflect higher averaged cost &amp; risk.
@@ -1476,6 +1484,7 @@ function collectFilters() {
   const maxAvg = parseInt(document.getElementById('bt-max-avg').value);
   const targetInputs = document.querySelectorAll('#bt-targets-container input[data-tidx]');
   const targets = Array.from(targetInputs).map(inp => parseFloat(inp.value) || _DEF[parseInt(inp.dataset.tidx)]);
+  const avgMode = document.getElementById('bt-avg-mode').value;
   return {
     maType:    document.getElementById('bt-ma-type').value,
     maPeriod:  parseInt(document.getElementById('bt-ma-period').value) || 200,
@@ -1484,6 +1493,7 @@ function collectFilters() {
     rsiFilter: document.getElementById('bt-rsi-filter').value,
     maxAvg,
     targets,
+    avgMode,
   };
 }
 
@@ -1501,7 +1511,7 @@ function runBacktest() {
   const riskPct  = riskMode === 'pct' ? riskVal : (riskVal / capital) * 100;
 
   const universe = state_bt_universe.current;
-  const fq = \`&maType=\${filters.maType}&maPeriod=\${filters.maPeriod}&w52filter=\${filters.w52filter}&volFilter=\${filters.volFilter}&rsiFilter=\${filters.rsiFilter}&maxAvg=\${filters.maxAvg}&targets=\${encodeURIComponent(filters.targets.join(','))}&riskPct=\${riskPct}&universe=\${universe}\`;
+  const fq = \`&maType=\${filters.maType}&maPeriod=\${filters.maPeriod}&w52filter=\${filters.w52filter}&volFilter=\${filters.volFilter}&rsiFilter=\${filters.rsiFilter}&maxAvg=\${filters.maxAvg}&targets=\${encodeURIComponent(filters.targets.join(','))}&riskPct=\${riskPct}&universe=\${universe}&avgMode=\${filters.avgMode}\`;
 
   // Also call onMaxAvgChange immediately after load to seed the dynamic rows if not yet rendered
   if (!document.querySelector('#bt-targets-container input')) onMaxAvgChange();
@@ -2941,7 +2951,8 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
   const { maType = 'none', maPeriod = 200, w52filter = 'none',
           volFilter = 'none', rsiFilter = 'none',
           maxAverages = 3,
-          targetPcts = [0.20, 0.15, 0.10, 0.05] } = opts;
+          targetPcts = [0.20, 0.15, 0.10, 0.05],
+          avgMode = 'native' } = opts;  // 'native' | 'below_entry'
 
   const TOLERANCE     = 0.005;
   const needMA        = maType !== 'none';
@@ -2991,7 +3002,15 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
 
       if (pos.avgCount < maxAverages) {
         const atLow = Math.abs(today.low - low20) / low20 <= TOLERANCE;
-        if (atLow) gtt = { trigger: high20, avg: true };
+        if (atLow) {
+          // 'below_entry': only allow averaging if the GTT trigger (20D high) is
+          // strictly below the initial entry price — i.e. we'd be buying cheaper.
+          // 'native': average on any new 20D low signal regardless of price level.
+          const triggerAllowed = avgMode === 'below_entry'
+            ? high20 < pos.entryPrice
+            : true;
+          if (triggerAllowed) gtt = { trigger: high20, avg: true };
+        }
       }
       if (gtt && gtt.avg) {
         gtt.trigger = high20;
@@ -3098,6 +3117,7 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
           // the real execution would be at today's open (the first available price).
           const fillPrice  = Math.max(gtt.trigger, today.open);
           pos = { entryDate: d, avgPrice: fillPrice,
+                  entryPrice: fillPrice,              // original buy price — never changes
                   totalInvested: tradeSize, avgCount: 0,
                   maxHigh: fillPrice,
                   maxHighAfterAvg: fillPrice,   // resets on each average
@@ -3196,13 +3216,13 @@ app.get('/api/backtest/run', async (req, res) => {
           maType = 'none', maPeriod = '200', w52filter = 'none',
           volFilter = 'none', rsiFilter = 'none',
           maxAvg = '3', targets = '20,15,10,8,6,5,4',
-          riskPct = '2', universe = 'NIFTY50' } = req.query;
+          riskPct = '2', universe = 'NIFTY50', avgMode = 'native' } = req.query;
 
   const cap         = parseFloat(capital);
   const riskPctNum  = parseFloat(riskPct) || 2;
   const targetPcts  = targets.split(',').map(v => parseFloat(v.trim()) / 100).filter(v => !isNaN(v));
   const maxAverages = parseInt(maxAvg);
-  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts };
+  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode };
 
   if (!token || !clientId) {
     return res.status(400).json({ error: 'token and clientId required' });
@@ -3446,14 +3466,14 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
     maType = 'none', maPeriod = '200', w52filter = 'none',
     volFilter = 'none', rsiFilter = 'none',
     maxAvg = '3', targets = '20,15,10,8,6,5,4',
-    riskPct = '2', universe = 'NIFTY50',
+    riskPct = '2', universe = 'NIFTY50', avgMode = 'native',
   } = req.query;
 
   const cap         = parseFloat(capital);
   const riskPctNum  = parseFloat(riskPct) || 2;
   const targetPcts  = targets.split(',').map(v => parseFloat(v.trim()) / 100).filter(v => !isNaN(v));
   const maxAverages = parseInt(maxAvg);
-  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts };
+  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode };
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
