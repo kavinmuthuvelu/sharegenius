@@ -3,6 +3,7 @@ const fs = require('fs').promises;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
 // On Render, use /tmp for ephemeral storage
 const DATA_FILE = process.env.DATA_FILE || '/tmp/sharegenius-data.json';
 
@@ -124,8 +125,7 @@ const HTML_PAGE = `<!DOCTYPE html>
       color: var(--text2);
     }
     .market-dot {
-      width: 7px;
-      height: 7px;
+      width: 7px; height: 7px;
       border-radius: 50%;
       background: var(--green);
       box-shadow: 0 0 6px var(--green);
@@ -633,8 +633,7 @@ const HTML_PAGE = `<!DOCTYPE html>
 
     /* ── LOADING SPINNER ─────────────────────────────── */
     .spinner {
-      width: 14px;
-      height: 14px;
+      width: 14px; height: 14px;
       border: 2px solid rgba(245,166,35,0.3);
       border-top-color: var(--gold);
       border-radius: 50%;
@@ -655,6 +654,7 @@ const HTML_PAGE = `<!DOCTYPE html>
 <body>
 <div id="app">
 
+  <!-- ═══════ HEADER ════════════════════════════════════ -->
   <header>
     <div class="logo">
       <div class="logo-icon">📈</div>
@@ -672,6 +672,7 @@ const HTML_PAGE = `<!DOCTYPE html>
     </div>
   </header>
 
+  <!-- ═══════ TABS ══════════════════════════════════════ -->
   <nav class="tabs">
     <button class="tab-btn active" onclick="switchTab('scanner')" id="tab-scanner">
       <span class="tab-icon">🔍</span> Scanner
@@ -692,8 +693,10 @@ const HTML_PAGE = `<!DOCTYPE html>
     </button>
   </nav>
 
+  <!-- ═══════ MAIN CONTENT ══════════════════════════════ -->
   <main>
 
+    <!-- ─── SCANNER PANEL ─────────────────────────────── -->
     <div class="panel active" id="panel-scanner">
       <div class="section-header">
         <div>
@@ -712,6 +715,7 @@ const HTML_PAGE = `<!DOCTYPE html>
         </div>
       </div>
 
+      <!-- Progress -->
       <div class="progress-wrap" id="progress-wrap">
         <div class="progress-meta">
           <span id="progress-label">Scanning...</span>
@@ -723,6 +727,7 @@ const HTML_PAGE = `<!DOCTYPE html>
         <div class="scan-status" id="scan-status">—</div>
       </div>
 
+      <!-- Scanner Stats -->
       <div class="stats-row" id="scan-stats" style="display:none">
         <div class="stat-card">
           <div class="stat-label">Scanned</div>
@@ -746,6 +751,7 @@ const HTML_PAGE = `<!DOCTYPE html>
         </div>
       </div>
 
+      <!-- Results Table -->
       <div class="table-wrap">
         <table id="scan-table">
           <thead>
@@ -769,6 +775,7 @@ const HTML_PAGE = `<!DOCTYPE html>
       </div>
     </div>
 
+    <!-- ─── WATCHLIST PANEL ───────────────────────────── -->
     <div class="panel" id="panel-watchlist">
       <div class="section-header">
         <div>
@@ -814,6 +821,7 @@ const HTML_PAGE = `<!DOCTYPE html>
       </div>
     </div>
 
+    <!-- ─── POSITIONS PANEL ───────────────────────────── -->
     <div class="panel" id="panel-positions">
       <div class="section-header">
         <div>
@@ -830,6 +838,7 @@ const HTML_PAGE = `<!DOCTYPE html>
         </div>
       </div>
 
+      <!-- Portfolio Stats -->
       <div class="stats-row" id="portfolio-stats">
         <div class="stat-card">
           <div class="stat-label">Open Positions</div>
@@ -882,6 +891,7 @@ const HTML_PAGE = `<!DOCTYPE html>
       </div>
     </div>
 
+    <!-- ─── GUIDE PANEL ───────────────────────────────── -->
     <div class="panel" id="panel-guide">
       <div class="section-header">
         <div>
@@ -895,7 +905,8 @@ const HTML_PAGE = `<!DOCTYPE html>
         <div class="infobox-text">
           <div class="infobox-title">Sharegenius 20-Day GTT Swing Method</div>
           <div class="infobox-desc">
-            Buy stocks at their 20-day low using a GTT trigger at the 20-day high. Target 20% gains in 2–20 days. Apply only to blue-chip stocks (Nifty 50 / 100 / 200). Average down up to 3 times if stock falls further.
+            Buy stocks at their 20-day low using a GTT trigger at the 20-day high. Target 20% gains in 2–20 days.
+            Apply only to blue-chip stocks (Nifty 50 / 100 / 200). Average down up to 3 times if stock falls further.
           </div>
         </div>
       </div>
@@ -961,6 +972,7 @@ const HTML_PAGE = `<!DOCTYPE html>
     </div>
 
 
+    <!-- ─── BACKTEST PANEL ───────────────────────────────── -->
     <div class="panel" id="panel-backtest">
       <div class="section-header">
         <div>
@@ -974,6 +986,7 @@ const HTML_PAGE = `<!DOCTYPE html>
         </div>
       </div>
 
+      <!-- Source toggle + Universe selector -->
       <div style="display:flex;gap:20px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
         <div style="display:flex;gap:8px;align-items:center;">
           <span style="font-size:12px;color:var(--text2);font-family:var(--mono);">DATA SOURCE:</span>
@@ -987,6 +1000,7 @@ const HTML_PAGE = `<!DOCTYPE html>
         </div>
       </div>
 
+      <!-- ── ROW 1: Credentials + Dates ──────────────────────── -->
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:12px;">
         <div class="stat-card" id="bt-field-clientid">
           <div class="stat-label">Dhan Client ID</div>
@@ -1006,6 +1020,7 @@ const HTML_PAGE = `<!DOCTYPE html>
         </div>
       </div>
 
+      <!-- ── ROW 2: Capital + Risk per trade ───────────────────── -->
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:12px;">
         <div class="stat-card">
           <div class="stat-label">Capital ₹</div>
@@ -1029,6 +1044,7 @@ const HTML_PAGE = `<!DOCTYPE html>
         </div>
       </div>
 
+      <!-- ── ROW 3: Entry Filters ───────────────────────────────── -->
       <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius2);padding:14px 16px;margin-bottom:12px;">
         <div style="font-size:12px;font-family:var(--mono);color:var(--gold);font-weight:700;letter-spacing:0.5px;margin-bottom:12px;">⚙️ ENTRY FILTERS (optional — leave blank to use base strategy)</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
@@ -1041,7 +1057,8 @@ const HTML_PAGE = `<!DOCTYPE html>
                 <option value="sma">SMA</option>
                 <option value="ema">EMA</option>
               </select>
-              <input class="form-input" id="bt-ma-period" type="number" value="200" min="5" max="500" placeholder="Period" style="font-size:12px;width:80px;" />
+              <input class="form-input" id="bt-ma-period" type="number" value="200" min="5" max="500"
+                placeholder="Period" style="font-size:12px;width:80px;" />
             </div>
             <div class="form-hint">Only enter trade if CMP &gt; MA(N)</div>
           </div>
@@ -1086,6 +1103,7 @@ const HTML_PAGE = `<!DOCTYPE html>
         </div>
       </div>
 
+      <!-- ── ROW 4: Averaging Config ───────────────────────────────── -->
       <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius2);padding:14px 16px;margin-bottom:12px;">
         <div style="font-size:12px;font-family:var(--mono);color:var(--cyan);font-weight:700;letter-spacing:0.5px;margin-bottom:12px;">🔄 AVERAGING CONFIG — Custom targets for every level</div>
         <div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
@@ -1109,12 +1127,14 @@ const HTML_PAGE = `<!DOCTYPE html>
         </div>
         <div id="bt-targets-container" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:10px;"></div>
       </div>
+      <!-- Bhavcopy info box -->
       <div id="bt-bhavcopy-info" style="display:none;background:var(--green-bg);border:1px solid var(--green);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;font-size:12px;font-family:var(--mono);color:var(--green);line-height:1.7;">
         ✅ <strong>No login needed.</strong> Downloads official NSE daily Bhavcopy files directly from nsearchives.nseindia.com.<br/>
         📅 Covers Jan 2021 → today (old + new UDiFF format auto-detected).<br/>
         ⏱ ~1300 trading days × 1 file/day — takes 4–8 min on first run. Results stream live.
       </div>
 
+      <!-- Progress -->
       <div class="progress-wrap" id="bt-progress-wrap">
         <div class="progress-meta">
           <span id="bt-progress-label">Fetching data from Dhan...</span>
@@ -1126,9 +1146,11 @@ const HTML_PAGE = `<!DOCTYPE html>
         <div class="scan-status" id="bt-scan-status">—</div>
       </div>
 
+      <!-- Summary Stats -->
       <div id="bt-summary" style="display:none;">
         <div class="stats-row" style="margin-bottom:20px;" id="bt-stat-cards"></div>
 
+        <!-- Year-wise table -->
         <div class="table-wrap" style="margin-bottom:20px;">
           <table>
             <thead>
@@ -1145,15 +1167,19 @@ const HTML_PAGE = `<!DOCTYPE html>
           </table>
         </div>
 
+        <!-- Analysis Panel -->
         <div id="bt-analysis-panel" style="margin-bottom:20px;"></div>
 
+        <!-- Trade log -->
         <div class="section-header" style="margin-bottom:12px;">
           <div class="section-title" style="font-size:16px;">Trade Log</div>
           <div class="section-actions">
-            <select class="form-input" id="bt-filter-sym" onchange="renderBtTrades()" style="font-size:12px;padding:6px 10px;width:140px;">
+            <select class="form-input" id="bt-filter-sym" onchange="renderBtTrades()"
+              style="font-size:12px;padding:6px 10px;width:140px;">
               <option value="">All symbols</option>
             </select>
-            <select class="form-input" id="bt-filter-result" onchange="renderBtTrades()" style="font-size:12px;padding:6px 10px;width:120px;">
+            <select class="form-input" id="bt-filter-result" onchange="renderBtTrades()"
+              style="font-size:12px;padding:6px 10px;width:120px;">
               <option value="">All results</option>
               <option value="win">Wins only</option>
               <option value="loss">Losses only</option>
@@ -1170,7 +1196,7 @@ const HTML_PAGE = `<!DOCTYPE html>
                 <th>Symbol</th>
                 <th class="num">Entry Date</th>
                 <th class="num">Exit Date</th>
-                <th class="num">Entry / Avg ₹</th>
+                <th class="num">Entry ₹</th>
                 <th class="num">Exit ₹</th>
                 <th class="num">Invested ₹</th>
                 <th class="num">Hold</th>
@@ -1188,6 +1214,7 @@ const HTML_PAGE = `<!DOCTYPE html>
         </div>
       </div>
 
+      <!-- Empty state -->
       <div id="bt-empty" style="text-align:center;padding:60px 20px;color:var(--text3);">
         <div style="font-size:40px;margin-bottom:12px;opacity:0.4">📊</div>
         <div style="font-size:16px;font-weight:700;color:var(--text2);margin-bottom:6px;">Real backtest on actual NSE prices</div>
@@ -1202,6 +1229,9 @@ const HTML_PAGE = `<!DOCTYPE html>
   </main>
 </div>
 
+<!-- ═══════ MODALS ═════════════════════════════════════ -->
+
+<!-- Add to Watchlist -->
 <div class="modal-overlay" id="modal-addwatch">
   <div class="modal">
     <div class="modal-title">
@@ -1224,6 +1254,7 @@ const HTML_PAGE = `<!DOCTYPE html>
   </div>
 </div>
 
+<!-- Add Position -->
 <div class="modal-overlay" id="modal-addpos">
   <div class="modal">
     <div class="modal-title">
@@ -1256,6 +1287,7 @@ const HTML_PAGE = `<!DOCTYPE html>
   </div>
 </div>
 
+<!-- Average Down -->
 <div class="modal-overlay" id="modal-average">
   <div class="modal">
     <div class="modal-title">
@@ -1281,6 +1313,7 @@ const HTML_PAGE = `<!DOCTYPE html>
   </div>
 </div>
 
+<!-- Close Position -->
 <div class="modal-overlay" id="modal-close-pos">
   <div class="modal">
     <div class="modal-title">
@@ -1299,6 +1332,7 @@ const HTML_PAGE = `<!DOCTYPE html>
   </div>
 </div>
 
+<!-- Toast Container -->
 <div id="toast-container"></div>
 
 <script>
@@ -1315,6 +1349,7 @@ const state = {
   avgTargetId: null,
   closePosId: null,
 };
+
 // ═══════════════════════════════════════════════════════
 //  HELPERS
 // ═══════════════════════════════════════════════════════
@@ -1322,11 +1357,12 @@ const fmt = (n, d=2) => n == null ? '—' : Number(n).toLocaleString('en-IN', { 
 const fmtCurr = (n, d=2) => n == null ? '—' : '₹' + fmt(n, d);
 const pct = n => n == null ? '—' : (n >= 0 ? '+' : '') + fmt(n, 2) + '%';
 const clsChg = n => n > 0 ? 'up' : n < 0 ? 'down' : 'flat';
+
 function toast(msg, type='info', dur=4000) {
   const icons = { success: '✅', error: '❌', info: 'ℹ️' };
   const el = document.createElement('div');
-  el.className = `toast ${type}`;
-  el.innerHTML = `<span>${icons[type]||'ℹ️'}</span><span>${msg}</span>`;
+  el.className = \`toast \${type}\`;
+  el.innerHTML = \`<span>\${icons[type]||'ℹ️'}</span><span>\${msg}</span>\`;
   document.getElementById('toast-container').appendChild(el);
   setTimeout(() => el.remove(), dur);
 }
@@ -1352,6 +1388,7 @@ function switchTab(tab) {
 //  BACKTEST — Dhan Historical API
 // ═══════════════════════════════════════════════════════
 const state_bt = { trades: [], running: false, startCapital: 400000 };
+
 const state_bt_source = { current: 'dhan' };
 
 // ── Risk helpers ─────────────────────────────────────────────────────────────
@@ -1379,14 +1416,14 @@ function onRiskChange() {
   const ts  = getEffectiveTradeSize();
   const cap = parseFloat(document.getElementById('bt-capital').value) || 400000;
   const pct = ((ts / cap) * 100).toFixed(1);
-  document.getElementById('bt-effective-size').textContent = `₹${ts.toLocaleString('en-IN')}`;
+  document.getElementById('bt-effective-size').textContent = \`\u20b9\${ts.toLocaleString('en-IN')}\`;
   const isCompound = document.getElementById('bt-risk-mode').value === 'pct';
   document.getElementById('bt-pct-of-capital').textContent = isCompound
-    ? `${pct}% of capital \u2022 compounds on profit`
-    : `${pct}% of capital \u2022 fixed size`;
+    ? \`\${pct}% of capital \u2022 compounds on profit\`
+    : \`\${pct}% of capital \u2022 fixed size\`;
   document.getElementById('bt-risk-hint').textContent = isCompound
-    ? `= ₹${ts.toLocaleString('en-IN')} initial · grows as capital compounds`
-    : `${pct}% of capital per trade (fixed)`;
+    ? \`= \u20b9\${ts.toLocaleString('en-IN')} initial · grows as capital compounds\`
+    : \`\${pct}% of capital per trade (fixed)\`;
 }
 
 function switchBtSource(src) {
@@ -1423,14 +1460,14 @@ function onMaxAvgChange() {
     const saved = vals[i] !== undefined ? vals[i] : _DEF[i];
     const div = document.createElement('div');
     div.style.cssText = 'background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;';
-    div.innerHTML = `
-      <div style="font-size:10px;font-family:var(--mono);color:var(--cyan);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;">Level ${i} \u2014 ${_ORD[i]}</div>
+    div.innerHTML = \`
+      <div style="font-size:10px;font-family:var(--mono);color:var(--cyan);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;">Level \${i} \u2014 \${_ORD[i]}</div>
       <div style="display:flex;align-items:center;gap:6px;">
-        <input class="form-input" type="number" data-tidx="${i}" value="${saved}" min="0.5" max="200" step="0.5"
+        <input class="form-input" type="number" data-tidx="\${i}" value="\${saved}" min="0.5" max="200" step="0.5"
           style="font-size:13px;font-weight:700;color:var(--gold);flex:1;text-align:right;" />
         <span style="font-size:13px;color:var(--text2);font-family:var(--mono);">%</span>
       </div>
-      <div class="form-hint">${_HINT[i]}</div>`;
+      <div class="form-hint">\${_HINT[i]}</div>\`;
     con.appendChild(div);
   }
 }
@@ -1462,19 +1499,21 @@ function runBacktest() {
   const riskMode = document.getElementById('bt-risk-mode').value;
   const riskVal  = parseFloat(document.getElementById('bt-risk-value').value);
   const riskPct  = riskMode === 'pct' ? riskVal : (riskVal / capital) * 100;
+
   const universe = state_bt_universe.current;
-  const fq = `&maType=${filters.maType}&maPeriod=${filters.maPeriod}&w52filter=${filters.w52filter}&volFilter=${filters.volFilter}&rsiFilter=${filters.rsiFilter}&maxAvg=${filters.maxAvg}&targets=${encodeURIComponent(filters.targets.join(','))}&riskPct=${riskPct}&universe=${universe}`;
+  const fq = \`&maType=\${filters.maType}&maPeriod=\${filters.maPeriod}&w52filter=\${filters.w52filter}&volFilter=\${filters.volFilter}&rsiFilter=\${filters.rsiFilter}&maxAvg=\${filters.maxAvg}&targets=\${encodeURIComponent(filters.targets.join(','))}&riskPct=\${riskPct}&universe=\${universe}\`;
 
   // Also call onMaxAvgChange immediately after load to seed the dynamic rows if not yet rendered
   if (!document.querySelector('#bt-targets-container input')) onMaxAvgChange();
+
   let url;
   if (source === 'dhan') {
     const token    = document.getElementById('bt-token').value.trim();
     const clientId = document.getElementById('bt-client-id').value.trim();
     if (!token || !clientId) return toast('Enter Dhan Client ID and Access Token', 'error');
-    url = `/api/backtest/run?token=${encodeURIComponent(token)}&clientId=${encodeURIComponent(clientId)}&capital=${capital}&tradeSize=${tradeSize}&fromDate=${fromDate}&toDate=${toDate}${fq}`;
+    url = \`/api/backtest/run?token=\${encodeURIComponent(token)}&clientId=\${encodeURIComponent(clientId)}&capital=\${capital}&tradeSize=\${tradeSize}&fromDate=\${fromDate}&toDate=\${toDate}\${fq}\`;
   } else {
-    url = `/api/backtest/bhavcopy?capital=${capital}&tradeSize=${tradeSize}&fromDate=${fromDate}&toDate=${toDate}${fq}`;
+    url = \`/api/backtest/bhavcopy?capital=\${capital}&tradeSize=\${tradeSize}&fromDate=\${fromDate}&toDate=\${toDate}\${fq}\`;
   }
 
   state_bt.running      = true;
@@ -1487,16 +1526,18 @@ function runBacktest() {
   document.getElementById('bt-empty').style.display   = 'none';
 
   const es = new EventSource(url);
+
   es.onmessage = (e) => {
     const msg = JSON.parse(e.data);
+
     if (msg.type === 'progress') {
       const p = Math.round((msg.current / msg.total) * 100);
       document.getElementById('bt-progress-fill').style.width = p + '%';
       document.getElementById('bt-progress-pct').textContent = p + '%';
       document.getElementById('bt-scan-status').textContent =
-        `${msg.symbol}: ${msg.status}${msg.error ? ' — ⚠️ ' + msg.error : ''}`;
+        \`\${msg.symbol}: \${msg.status}\${msg.error ? ' — ⚠\ufe0f ' + msg.error : ''}\`;
       document.getElementById('bt-progress-label').textContent =
-        `Fetching [${msg.current}/${msg.total}] ${msg.symbol}...`;
+        \`Fetching [\${msg.current}/\${msg.total}] \${msg.symbol}...\`;
       if (msg.trades) state_bt.trades.push(...msg.trades);
     }
 
@@ -1507,29 +1548,30 @@ function runBacktest() {
     if (msg.type === 'complete') {
       es.close();
       state_bt.running = false;
-      document.getElementById('bt-run-btn').innerHTML = '▶ Run Backtest';
+      document.getElementById('bt-run-btn').innerHTML = '\u25b6 Run Backtest';
       document.getElementById('bt-run-btn').disabled = false;
       document.getElementById('bt-progress-wrap').classList.remove('visible');
       if (msg.trades && msg.trades.length) state_bt.trades = msg.trades;
       renderBtResults(msg.summary, msg.byYear, capital);
       renderBtAnalysis(msg.summary, msg.byYear, state_bt.trades, capital, tradeSize, filters);
       const src = msg.source === 'bhavcopy' ? 'NSE Bhavcopy' : 'Dhan API';
-      toast(`Backtest complete [${src}] — ${msg.summary.closed_trades} trades, ${msg.summary.win_rate}% win rate`, 'success');
+      toast(\`Backtest complete [\${src}] — \${msg.summary.closed_trades} trades, \${msg.summary.win_rate}% win rate\`, 'success');
     }
 
     if (msg.type === 'error') {
       es.close();
       state_bt.running = false;
-      document.getElementById('bt-run-btn').innerHTML = '▶ Run Backtest';
+      document.getElementById('bt-run-btn').innerHTML = '\u25b6 Run Backtest';
       document.getElementById('bt-run-btn').disabled = false;
       document.getElementById('bt-progress-wrap').classList.remove('visible');
       toast(msg.error, 'error');
     }
   };
+
   es.onerror = () => {
     es.close();
     state_bt.running = false;
-    document.getElementById('bt-run-btn').innerHTML = '▶ Run Backtest';
+    document.getElementById('bt-run-btn').innerHTML = '\u25b6 Run Backtest';
     document.getElementById('bt-run-btn').disabled = false;
     document.getElementById('bt-progress-wrap').classList.remove('visible');
     toast('Backtest connection error', 'error');
@@ -1539,56 +1581,56 @@ function runBacktest() {
 function renderBtResults(summary, byYear, capital) {
   document.getElementById('bt-summary').style.display = 'block';
   const totalReturn = ((summary.final_value - capital) / capital * 100).toFixed(1);
-  document.getElementById('bt-stat-cards').innerHTML = `
+  document.getElementById('bt-stat-cards').innerHTML = \`
     <div class="stat-card">
       <div class="stat-label">Final Value</div>
-      <div class="stat-value gold">${fmtCurr(summary.final_value, 0)}</div>
-      <div class="stat-sub">Started ${fmtCurr(capital, 0)}</div>
+      <div class="stat-value gold">\${fmtCurr(summary.final_value, 0)}</div>
+      <div class="stat-sub">Started \${fmtCurr(capital, 0)}</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Total Return</div>
-      <div class="stat-value ${summary.total_pnl >= 0 ? 'green' : 'red'}">${totalReturn >= 0 ? '+' : ''}${totalReturn}%</div>
-      <div class="stat-sub">CAGR ${summary.cagr}% / yr</div>
+      <div class="stat-value \${summary.total_pnl >= 0 ? 'green' : 'red'}">\${totalReturn >= 0 ? '+' : ''}\${totalReturn}%</div>
+      <div class="stat-sub">CAGR \${summary.cagr}% / yr</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">P&L</div>
-      <div class="stat-value ${summary.total_pnl >= 0 ? 'green' : 'red'}">${fmtCurr(summary.total_pnl, 0)}</div>
-      <div class="stat-sub">${summary.closed_trades} closed trades</div>
+      <div class="stat-value \${summary.total_pnl >= 0 ? 'green' : 'red'}">\${fmtCurr(summary.total_pnl, 0)}</div>
+      <div class="stat-sub">\${summary.closed_trades} closed trades</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Win Rate</div>
-      <div class="stat-value">${summary.win_rate}%</div>
-      <div class="stat-sub">${summary.win_trades}W / ${summary.loss_trades}L (open)</div>
+      <div class="stat-value">\${summary.win_rate}%</div>
+      <div class="stat-sub">\${summary.win_trades}W / \${summary.loss_trades}L (open)</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Avg Win</div>
-      <div class="stat-value green">+${fmtCurr(summary.avg_win, 0)}</div>
-      <div class="stat-sub">in ${summary.avg_hold_win} days</div>
+      <div class="stat-value green">+\${fmtCurr(summary.avg_win, 0)}</div>
+      <div class="stat-sub">in \${summary.avg_hold_win} days</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Open Positions MTM</div>
-      <div class="stat-value ${summary.avg_loss >= 0 ? 'green' : 'red'}">${fmtCurr(summary.avg_loss, 0)}</div>
-      <div class="stat-sub">avg open P&L, ${summary.open_trades} positions</div>
+      <div class="stat-value \${summary.avg_loss >= 0 ? 'green' : 'red'}">\${fmtCurr(summary.avg_loss, 0)}</div>
+      <div class="stat-sub">avg open P&L, \${summary.open_trades} positions</div>
     </div>
-    <div class="stat-card" style="${summary.min_capital && summary.min_capital < capital ? 'background:var(--red-bg);border-color:rgba(240,82,82,0.35);' : 'background:var(--green-bg);border-color:rgba(34,217,122,0.3);'}">
-      <div class="stat-label" style="color:${summary.min_capital && summary.min_capital < capital ? 'var(--red)' : 'var(--green)'}">⚠️ Lowest Capital</div>
-      <div class="stat-value ${summary.min_capital && summary.min_capital < capital ? 'red' : 'green'}">${fmtCurr(summary.min_capital || capital, 0)}</div>
-      <div class="stat-sub">${summary.min_capital_date ? 'on ' + summary.min_capital_date : 'Capital never dipped'}</div>
-    </div>`;
+    <div class="stat-card" style="\${summary.min_capital && summary.min_capital < capital ? 'background:var(--red-bg);border-color:rgba(240,82,82,0.35);' : 'background:var(--green-bg);border-color:rgba(34,217,122,0.3);'}">
+      <div class="stat-label" style="color:\${summary.min_capital && summary.min_capital < capital ? 'var(--red)' : 'var(--green)'}">⚠️ Lowest Capital</div>
+      <div class="stat-value \${summary.min_capital && summary.min_capital < capital ? 'red' : 'green'}">\${fmtCurr(summary.min_capital || capital, 0)}</div>
+      <div class="stat-sub">\${summary.min_capital_date ? 'on ' + summary.min_capital_date : 'Capital never dipped'}</div>
+    </div>\`;
 
-  document.getElementById('bt-year-tbody').innerHTML = Object.entries(byYear).map(([y, v]) => `
+  document.getElementById('bt-year-tbody').innerHTML = Object.entries(byYear).map(([y, v]) => \`
     <tr>
-      <td><strong>${y}</strong></td>
-      <td class="num">${v.trades}</td>
-      <td class="num up">${v.wins}</td>
-      <td class="num down">${v.losses}</td>
-      <td class="num">${v.win_rate}%</td>
-      <td class="num ${v.pnl >= 0 ? 'up' : 'down'}">${v.pnl >= 0 ? '+' : ''}${fmtCurr(v.pnl, 0)}</td>
-    </tr>`).join('');
+      <td><strong>\${y}</strong></td>
+      <td class="num">\${v.trades}</td>
+      <td class="num up">\${v.wins}</td>
+      <td class="num down">\${v.losses}</td>
+      <td class="num">\${v.win_rate}%</td>
+      <td class="num \${v.pnl >= 0 ? 'up' : 'down'}">\${v.pnl >= 0 ? '+' : ''}\${fmtCurr(v.pnl, 0)}</td>
+    </tr>\`).join('');
 
   const syms = [...new Set(state_bt.trades.map(t => t.symbol))].sort();
   const sel  = document.getElementById('bt-filter-sym');
-  sel.innerHTML = '<option value="">All symbols</option>' + syms.map(s => `<option value="${s}">${s}</option>`).join('');
+  sel.innerHTML = '<option value="">All symbols</option>' + syms.map(s => \`<option value="\${s}">\${s}</option>\`).join('');
   renderBtTrades();
 }
 
@@ -1597,24 +1639,26 @@ function renderBtAnalysis(summary, byYear, trades, capital, tradeSize, filters) 
   const closed  = trades.filter(t => t.exit_reason !== 'OPEN');
   const wins    = closed.filter(t => t.pnl > 0);
   const losses  = closed.filter(t => t.exit_reason === 'OPEN' && t.pnl < 0);
+
   // Compute metrics for suggestions
   const winRate    = summary.win_rate;
   const cagr       = summary.cagr;
   const avgHoldW   = summary.avg_hold_win;
   const avgHoldL   = summary.avg_hold_loss;
   const pctPerTrade = (tradeSize / capital * 100).toFixed(1);
+
   // Best and worst symbols
   const bySymPnl = {};
   for (const t of closed) {
     bySymPnl[t.symbol] = (bySymPnl[t.symbol] || 0) + t.pnl;
   }
   const sortedSyms = Object.entries(bySymPnl).sort((a,b) => b[1]-a[1]);
-  const bestSyms   = sortedSyms.slice(0,3).map(([s,p]) => `${s} (+${fmtCurr(p,0)})`).join(', ');
-  const worstSyms  = sortedSyms.slice(-3).reverse().map(([s,p]) => `${s} (${fmtCurr(p,0)})`).join(', ');
+  const bestSyms   = sortedSyms.slice(0,3).map(([s,p]) => \`\${s} (+\${fmtCurr(p,0)})\`).join(', ');
+  const worstSyms  = sortedSyms.slice(-3).reverse().map(([s,p]) => \`\${s} (\${fmtCurr(p,0)})\`).join(', ');
 
   // Avg count distribution
   const avgCounts = [0,1,2,3].map(n => ({ n, count: closed.filter(t => t.avg_count === n).length }));
-  const avgDistStr = avgCounts.map(x => `${x.count}× at ${x.n} avg`).join(' · ');
+  const avgDistStr = avgCounts.map(x => \`\${x.count}× at \${x.n} avg\`).join(' · ');
 
   // Year trend
   const years = Object.entries(byYear).sort((a,b)=>a[0]-b[0]);
@@ -1623,36 +1667,38 @@ function renderBtAnalysis(summary, byYear, trades, capital, tradeSize, filters) 
 
   // Build suggestions
   const suggestions = [];
+
   // 1 — Trade size / concentration
   if (parseFloat(pctPerTrade) < 1.5) {
-    suggestions.push({ icon: '📈', title: 'Increase trade size', body: `At ${pctPerTrade}% of capital per trade, gains are small. Consider 2–3% per trade. With ₹${Math.round(capital*0.02).toLocaleString('en-IN')} per trade you'd roughly double the absolute P&L without adding new risk.`, impact: 'HIGH' });
+    suggestions.push({ icon: '📈', title: 'Increase trade size', body: \`At \${pctPerTrade}% of capital per trade, gains are small. Consider 2–3% per trade. With ₹\${Math.round(capital*0.02).toLocaleString('en-IN')} per trade you'd roughly double the absolute P&L without adding new risk.\`, impact: 'HIGH' });
   }
   if (parseFloat(pctPerTrade) > 5) {
-    suggestions.push({ icon: '⚠️', title: 'Trade size is high', body: `At ${pctPerTrade}% per trade, simultaneous open positions tie up capital fast. Reduce to 2–3% to stay liquid for averaging opportunities.`, impact: 'MEDIUM' });
+    suggestions.push({ icon: '⚠️', title: 'Trade size is high', body: \`At \${pctPerTrade}% per trade, simultaneous open positions tie up capital fast. Reduce to 2–3% to stay liquid for averaging opportunities.\`, impact: 'MEDIUM' });
   }
 
   // 2 — Win rate based
   if (winRate < 60) {
-    suggestions.push({ icon: '🔍', title: 'Add MA200 filter to skip downtrends', body: `Win rate of ${winRate}% suggests you're entering stocks in structural downtrends. Enable the "Price above 200 SMA" filter — historically this alone lifts win rate by 8–12% by skipping stocks below their long-term trend.`, impact: 'HIGH' });
+    suggestions.push({ icon: '🔍', title: 'Add MA200 filter to skip downtrends', body: \`Win rate of \${winRate}% suggests you're entering stocks in structural downtrends. Enable the "Price above 200 SMA" filter — historically this alone lifts win rate by 8–12% by skipping stocks below their long-term trend.\`, impact: 'HIGH' });
   }
   if (winRate >= 70) {
-    suggestions.push({ icon: '✅', title: 'Strong win rate — scale up position size', body: `${winRate}% win rate is excellent. The bottleneck is position size. Increasing trade size from ${fmtCurr(tradeSize,0)} to ${fmtCurr(tradeSize*1.5,0)} on high-conviction signals (stocks within 5% of 52W low + above 200 MA) could boost CAGR materially.`, impact: 'HIGH' });
+    suggestions.push({ icon: '✅', title: 'Strong win rate — scale up position size', body: \`\${winRate}% win rate is excellent. The bottleneck is position size. Increasing trade size from \${fmtCurr(tradeSize,0)} to \${fmtCurr(tradeSize*1.5,0)} on high-conviction signals (stocks within 5% of 52W low + above 200 MA) could boost CAGR materially.\`, impact: 'HIGH' });
   }
 
   // 3 — Holding period
   if (avgHoldW > 60) {
-    suggestions.push({ icon: '⏱', title: 'Long hold times — consider partial booking', body: `Average winning trade held ${avgHoldW} days. Consider booking 50% at the target and holding the rest for further upside. This frees capital for new signals without sacrificing full upside.`, impact: 'MEDIUM' });
+    suggestions.push({ icon: '⏱', title: 'Long hold times — consider partial booking', body: \`Average winning trade held \${avgHoldW} days. Consider booking 50% at the target and holding the rest for further upside. This frees capital for new signals without sacrificing full upside.\`, impact: 'MEDIUM' });
   }
 
   // 4 — CAGR vs benchmark
   if (cagr < 12) {
-    suggestions.push({ icon: '📊', title: 'CAGR below Nifty benchmark — refine entry filters', body: `CAGR of ${cagr}% trails Nifty's ~14% CAGR over this period. Try combining: (1) Near 52W Low filter to find bottoming stocks, (2) RSI < 40 to confirm oversold entry, (3) Volume ≥ 1.5× to confirm interest. Individually each adds ~3–5% to win rate.`, impact: 'HIGH' });
+    suggestions.push({ icon: '📊', title: 'CAGR below Nifty benchmark — refine entry filters', body: \`CAGR of \${cagr}% trails Nifty's ~14% CAGR over this period. Try combining: (1) Near 52W Low filter to find bottoming stocks, (2) RSI < 40 to confirm oversold entry, (3) Volume ≥ 1.5× to confirm interest. Individually each adds ~3–5% to win rate.\`, impact: 'HIGH' });
   } else if (cagr >= 18) {
-    suggestions.push({ icon: '🏆', title: 'Excellent CAGR — replicate in Nifty Next 50', body: `${cagr}% CAGR is outstanding. The same strategy applied to Nifty Next 50 stocks (more volatile, larger swings) has historically produced 20–30% more trades and proportionally higher P&L.`, impact: 'MEDIUM' });
+    suggestions.push({ icon: '🏆', title: 'Excellent CAGR — replicate in Nifty Next 50', body: \`\${cagr}% CAGR is outstanding. The same strategy applied to Nifty Next 50 stocks (more volatile, larger swings) has historically produced 20–30% more trades and proportionally higher P&L.\`, impact: 'MEDIUM' });
   }
 
   // 5 — Best/worst symbols
-  suggestions.push({ icon: '⭐', title: 'Concentrate on your best performers', body: `Best contributors: ${bestSyms}. Worst drags: ${worstSyms}. Consider allocating ${Math.round(parseFloat(pctPerTrade)*1.5)}% of capital to top performers and skipping consistent underperformers entirely.`, impact: 'MEDIUM' });
+  suggestions.push({ icon: '⭐', title: 'Concentrate on your best performers', body: \`Best contributors: \${bestSyms}. Worst drags: \${worstSyms}. Consider allocating \${Math.round(parseFloat(pctPerTrade)*1.5)}% of capital to top performers and skipping consistent underperformers entirely.\`, impact: 'MEDIUM' });
+
   // 6 — 52W Low filter suggestion if not enabled
   if (filters.w52filter === 'none') {
     suggestions.push({ icon: '📉', title: 'Add "Near 52W Low" filter', body: 'Stocks at 20D low that are also within 10% of their 52-week low are at maximum pessimism — the highest-probability reversal zone. Enable this filter to screen only the most oversold setups.', impact: 'HIGH' });
@@ -1664,26 +1710,28 @@ function renderBtAnalysis(summary, byYear, trades, capital, tradeSize, filters) 
   }
 
   // 8 — Averaging distribution
-  suggestions.push({ icon: '🔢', title: 'Averaging distribution insight', body: `Your trades: ${avgDistStr}. If most wins are at 0 averages, the signal alone is strong — no averaging needed. If most of your highest P&L trades required averaging, the base signal is weak and you're relying on recovery — risky with large capital.`, impact: 'INFO' });
+  suggestions.push({ icon: '🔢', title: 'Averaging distribution insight', body: \`Your trades: \${avgDistStr}. If most wins are at 0 averages, the signal alone is strong — no averaging needed. If most of your highest P&L trades required averaging, the base signal is weak and you're relying on recovery — risky with large capital.\`, impact: 'INFO' });
+
   const impactColor = { HIGH: 'var(--green)', MEDIUM: 'var(--gold)', INFO: 'var(--blue)' };
   const impactBg    = { HIGH: 'var(--green-bg)', MEDIUM: 'var(--gold-glow)', INFO: 'rgba(96,165,250,0.08)' };
-  document.getElementById('bt-analysis-panel').innerHTML = `
+
+  document.getElementById('bt-analysis-panel').innerHTML = \`
     <div style="margin-bottom:14px;">
       <div class="section-title" style="font-size:16px;margin-bottom:4px;">📊 Strategy Analysis &amp; Suggestions</div>
       <div class="section-subtitle">Based on your backtest results — click any suggestion to act on it</div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px;">
-      ${suggestions.map(s => `
-        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius2);padding:14px;border-left:3px solid ${impactColor[s.impact]};">
+      \${suggestions.map(s => \`
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius2);padding:14px;border-left:3px solid \${impactColor[s.impact]};">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-            <span style="font-size:16px;">${s.icon}</span>
-            <span style="font-weight:700;font-size:13px;color:#fff;">${s.title}</span>
-            <span style="margin-left:auto;font-size:10px;font-family:var(--mono);padding:2px 7px;border-radius:10px;background:${impactBg[s.impact]};color:${impactColor[s.impact]};">${s.impact}</span>
+            <span style="font-size:16px;">\${s.icon}</span>
+            <span style="font-weight:700;font-size:13px;color:#fff;">\${s.title}</span>
+            <span style="margin-left:auto;font-size:10px;font-family:var(--mono);padding:2px 7px;border-radius:10px;background:\${impactBg[s.impact]};color:\${impactColor[s.impact]};">\${s.impact}</span>
           </div>
-          <div style="font-size:12px;color:var(--text2);font-family:var(--mono);line-height:1.6;">${s.body}</div>
+          <div style="font-size:12px;color:var(--text2);font-family:var(--mono);line-height:1.6;">\${s.body}</div>
         </div>
-      `).join('')}
-    </div>`;
+      \`).join('')}
+    </div>\`;
 }
 
 function getFilteredTrades() {
@@ -1699,6 +1747,7 @@ function getFilteredTrades() {
 function renderBtTrades() {
   const trades   = getFilteredTrades();
   const startCap = state_bt.startCapital || 400000;
+
   if (!trades.length) {
     document.getElementById('bt-trade-tbody').innerHTML =
       '<tr class="empty-row"><td colspan="14">No trades match filter</td></tr>';
@@ -1709,34 +1758,34 @@ function renderBtTrades() {
     const returnPct = t.invested > 0 ? ((t.pnl / t.invested) * 100).toFixed(1) : '\u2014';
     const isOpen    = t.exit_reason === 'OPEN';
     const maxPctStr = (isOpen && t.max_profit_pct != null)
-      ? `<span class="up">+${t.max_profit_pct.toFixed(1)}%</span>`
+      ? \`<span class="up">+\${t.max_profit_pct.toFixed(1)}%</span>\`
       : '\u2014';
     const capAfter  = t.capital_after;
     const capCell   = capAfter == null
       ? '<span style="color:var(--text3)">Open</span>'
-      : `<span style="font-weight:700;color:${capAfter >= startCap ? 'var(--green)' : 'var(--red)'}">${fmtCurr(capAfter, 0)}</span>`;
-    return `<tr>
-      <td><span class="sym-name">${t.symbol}</span></td>
-      <td class="num">${t.entry_date}</td>
-      <td class="num">${t.exit_date}</td>
-      <td class="num">${fmtCurr(t.entry_price)}<br><span style="font-size:10px;color:var(--text3)">Avg: ${fmtCurr(t.avg_price)}</span></td>
-      <td class="num">${fmtCurr(t.exit_price)}</td>
-      <td class="num">${fmtCurr(t.invested, 0)}</td>
-      <td class="num">${t.hold_days}d</td>
-      <td class="num">${t.avg_count > 0 ? t.avg_count + '\xd7' : '\u2014'}</td>
-      <td class="num" style="color:var(--gold)">${t.target_pct}%</td>
-      <td class="num ${t.pnl >= 0 ? 'up' : 'down'}">${t.pnl >= 0 ? '+' : ''}${fmtCurr(t.pnl, 0)}</td>
-      <td class="num ${t.pnl >= 0 ? 'up' : 'down'}">${t.pnl >= 0 ? '+' : ''}${returnPct}%</td>
-      <td class="num">${maxPctStr}</td>
-      <td class="num">${capCell}</td>
+      : \`<span style="font-weight:700;color:\${capAfter >= startCap ? 'var(--green)' : 'var(--red)'}">\${fmtCurr(capAfter, 0)}</span>\`;
+    return \`<tr>
+      <td><span class="sym-name">\${t.symbol}</span></td>
+      <td class="num">\${t.entry_date}</td>
+      <td class="num">\${t.exit_date}</td>
+      <td class="num">\${fmtCurr(t.entry_price)}</td>
+      <td class="num">\${fmtCurr(t.exit_price)}</td>
+      <td class="num">\${fmtCurr(t.invested, 0)}</td>
+      <td class="num">\${t.hold_days}d</td>
+      <td class="num">\${t.avg_count > 0 ? t.avg_count + '\xd7' : '\u2014'}</td>
+      <td class="num" style="color:var(--gold)">\${t.target_pct}%</td>
+      <td class="num \${t.pnl >= 0 ? 'up' : 'down'}">\${t.pnl >= 0 ? '+' : ''}\${fmtCurr(t.pnl, 0)}</td>
+      <td class="num \${t.pnl >= 0 ? 'up' : 'down'}">\${t.pnl >= 0 ? '+' : ''}\${returnPct}%</td>
+      <td class="num">\${maxPctStr}</td>
+      <td class="num">\${capCell}</td>
       <td>
-        ${t.exit_reason === 'TARGET'
+        \${t.exit_reason === 'TARGET'
           ? '<span class="badge badge-hit">\ud83c\udfaf TARGET</span>'
           : isOpen
           ? '<span class="badge badge-open">\ud83d\udcc2 OPEN</span>'
           : '<span class="badge badge-closed">EXIT</span>'}
       </td>
-    </tr>`;
+    </tr>\`;
   }).join('');
 }
 
@@ -1755,30 +1804,32 @@ function downloadTradeLogExcel() {
 
 function _doExcelExport(trades) {
   const startCap = state_bt.startCapital || 400000;
+
   // Trade Log sheet
   const rows = trades.map(t => ({
     'Symbol':            t.symbol,
     'Entry Date':        t.entry_date,
     'Exit Date':         t.exit_date,
-    'Initial Entry ₹':   t.entry_price,
-    'Avg Cost ₹':        t.avg_price,
-    'Exit Price ₹':      t.exit_price,
-    'Invested ₹':        t.invested,
+    'Entry Price \u20b9': t.entry_price,
+    'Exit Price \u20b9':  t.exit_price,
+    'Invested \u20b9':    t.invested,
     'Hold Days':         t.hold_days,
     'Averages':          t.avg_count,
     'Target %':          t.target_pct,
-    'P&L ₹':             t.pnl,
+    'P&L \u20b9':         t.pnl,
     'Return %':          t.invested > 0 ? +((t.pnl / t.invested) * 100).toFixed(2) : 0,
     'Max Profit % (open)': t.max_profit_pct || '',
-    'Capital After ₹':   t.capital_after != null ? t.capital_after : '',
+    'Capital After \u20b9': t.capital_after != null ? t.capital_after : '',
     'Exit Reason':       t.exit_reason,
   }));
+
   const ws = XLSX.utils.json_to_sheet(rows);
   ws['!cols'] = [
     {wch:14},{wch:12},{wch:12},{wch:14},{wch:13},
     {wch:13},{wch:10},{wch:9},{wch:9},{wch:12},
     {wch:10},{wch:20},{wch:16},{wch:12},
   ];
+
   // Summary sheet
   const allT    = state_bt.trades;
   const closed  = allT.filter(t => t.exit_reason !== 'OPEN');
@@ -1787,17 +1838,18 @@ function _doExcelExport(trades) {
   const minCap  = closed.length
     ? Math.min(...closed.filter(t => t.capital_after != null).map(t => t.capital_after))
     : startCap;
+
   const sumRows = [
-    { Metric: 'Starting Capital ₹', Value: startCap },
-    { Metric: 'Final Value ₹',      Value: +(startCap + totalPnl).toFixed(2) },
-    { Metric: 'Total P&L ₹',        Value: +totalPnl.toFixed(2) },
+    { Metric: 'Starting Capital \u20b9', Value: startCap },
+    { Metric: 'Final Value \u20b9',      Value: +(startCap + totalPnl).toFixed(2) },
+    { Metric: 'Total P&L \u20b9',        Value: +totalPnl.toFixed(2) },
     { Metric: 'Return %',               Value: +((totalPnl / startCap) * 100).toFixed(2) },
     { Metric: 'Total Trades',           Value: allT.length },
     { Metric: 'Closed Trades',          Value: closed.length },
     { Metric: 'Wins',                   Value: wins.length },
     { Metric: 'Win Rate %',             Value: closed.length ? +((wins.length / closed.length) * 100).toFixed(2) : 0 },
     { Metric: 'Open (MTM)',             Value: allT.filter(t => t.exit_reason === 'OPEN').length },
-    { Metric: 'Lowest Capital ₹',   Value: +minCap.toFixed(2) },
+    { Metric: 'Lowest Capital \u20b9',   Value: +minCap.toFixed(2) },
     { Metric: 'Universe',               Value: state_bt_universe ? state_bt_universe.current : 'NIFTY50' },
     { Metric: 'Exported',               Value: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) },
   ];
@@ -1807,7 +1859,7 @@ function _doExcelExport(trades) {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Trade Log');
   XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
-  XLSX.writeFile(wb, `Sharegenius_Backtest_${new Date().toISOString().slice(0,10)}.xlsx`);
+  XLSX.writeFile(wb, \`Sharegenius_Backtest_\${new Date().toISOString().slice(0,10)}.xlsx\`);
   toast('Excel downloaded \u2713', 'success');
 }
 
@@ -1823,7 +1875,8 @@ function updateClock() {
   const hh = ist.getHours(), mm = ist.getMinutes();
   const timeStr = ist.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Kolkata' });
   const day = ist.getDay();
-  document.getElementById('header-time').textContent = `IST ${timeStr}`;
+
+  document.getElementById('header-time').textContent = \`IST \${timeStr}\`;
 
   const isWeekend = day === 0 || day === 6;
   const isMarketHours = hh > 9 || (hh === 9 && mm >= 15);
@@ -1848,6 +1901,7 @@ document.querySelectorAll('.idx-btn').forEach(btn => {
     state.selectedIndex = btn.dataset.index;
   });
 });
+
 // ═══════════════════════════════════════════════════════
 //  SCANNER
 // ═══════════════════════════════════════════════════════
@@ -1855,6 +1909,7 @@ function startScan() {
   if (state.scanning) return;
   state.scanning = true;
   state.scanResults = [];
+
   const btn = document.getElementById('scan-btn');
   btn.innerHTML = '<span class="spinner"></span> Scanning...';
   btn.disabled = true;
@@ -1864,13 +1919,15 @@ function startScan() {
   document.getElementById('scan-stats').style.display = 'none';
   document.getElementById('scan-tbody').innerHTML = '';
 
-  const es = new EventSource(`/api/scan/${state.selectedIndex}`);
+  const es = new EventSource(\`/api/scan/\${state.selectedIndex}\`);
   let total = 0, current = 0, alerts = 0;
+
   es.onmessage = (e) => {
     const msg = JSON.parse(e.data);
+
     if (msg.type === 'start') {
       total = msg.total;
-      document.getElementById('progress-label').textContent = `Scanning ${msg.index}...`;
+      document.getElementById('progress-label').textContent = \`Scanning \${msg.index}...\`;
     }
 
     if (msg.type === 'progress') {
@@ -1879,7 +1936,8 @@ function startScan() {
       document.getElementById('progress-fill').style.width = p + '%';
       document.getElementById('progress-pct').textContent = p + '%';
       document.getElementById('scan-status').textContent =
-        `${msg.symbol}${msg.error ? ' ⚠️ ' + msg.error : ''}`;
+        \`\${msg.symbol}\${msg.error ? ' ⚠️ ' + msg.error : ''}\`;
+
       if (msg.data) {
         state.scanResults.push(msg.data);
         if (msg.data.isAt20DayLow) {
@@ -1904,11 +1962,13 @@ function startScan() {
       document.getElementById('stat-scanned').textContent = msg.total;
       document.getElementById('stat-alerts').textContent = msg.found;
       document.getElementById('stat-time').textContent = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' });
+
       // Move alert rows to top
       reorderScanTable();
-      toast(`Scan complete — ${msg.found} stocks at 20-day low`, 'success');
+      toast(\`Scan complete — \${msg.found} stocks at 20-day low\`, 'success');
     }
   };
+
   es.onerror = () => {
     es.close();
     state.scanning = false;
@@ -1926,29 +1986,29 @@ function appendScanRow(d, isAlert) {
   if (isAlert) row.className = 'alert-row';
   row.dataset.symbol = d.symbol;
   row.dataset.alert = isAlert ? '1' : '0';
-  row.innerHTML = `
+  row.innerHTML = \`
     <td>
       <div class="symbol-cell">
-        <span class="sym-name">${d.symbol}</span>
-        <span class="sym-sub">${(d.name||'').slice(0,28)}</span>
+        <span class="sym-name">\${d.symbol}</span>
+        <span class="sym-sub">\${(d.name||'').slice(0,28)}</span>
       </div>
     </td>
-    <td class="num">${fmtCurr(d.currentPrice)}</td>
-    <td class="num">${fmtCurr(d.todayLow)}</td>
-    <td class="num ${isAlert ? 'up' : ''}">${fmtCurr(d.low20)}</td>
-    <td class="num" style="color:var(--gold)">${fmtCurr(d.high20)}</td>
-    <td class="num ${clsChg(chgPct)}">${pct(chgPct)}</td>
+    <td class="num">\${fmtCurr(d.currentPrice)}</td>
+    <td class="num">\${fmtCurr(d.todayLow)}</td>
+    <td class="num \${isAlert ? 'up' : ''}">\${fmtCurr(d.low20)}</td>
+    <td class="num" style="color:var(--gold)">\${fmtCurr(d.high20)}</td>
+    <td class="num \${clsChg(chgPct)}">\${pct(chgPct)}</td>
     <td>
-      ${isAlert
+      \${isAlert
         ? '<span class="badge badge-alert">🔔 20D LOW MATCH</span>'
         : '<span class="badge badge-closed">Monitoring</span>'
       }
     </td>
     <td class="actions">
-      <button class="btn btn-sm" onclick='addToWatchlistFromScan(${JSON.stringify(d)})'>+ Watch</button>
-      ${isAlert ? `<button class="btn btn-sm btn-green" onclick='addToWatchlistFromScan(${JSON.stringify(d)}, true)'>+ GTT</button>` : ''}
+      <button class="btn btn-sm" onclick='addToWatchlistFromScan(\${JSON.stringify(d)})'>+ Watch</button>
+      \${isAlert ? \`<button class="btn btn-sm btn-green" onclick='addToWatchlistFromScan(\${JSON.stringify(d)}, true)'>+ GTT</button>\` : ''}
     </td>
-  `;
+  \`;
   tbody.appendChild(row);
 }
 
@@ -1963,11 +2023,11 @@ function reorderScanTable() {
 async function addToWatchlistFromScan(data, gttSet = false) {
   const r = await api('POST', '/api/watchlist', {
     symbol: data.symbol,
-    notes: gttSet ? `GTT: ${fmtCurr(data.high20)}` : ''
+    notes: gttSet ? \`GTT: \${fmtCurr(data.high20)}\` : ''
   });
   if (r.success) {
-    if (gttSet) await api('PUT', `/api/watchlist/${data.symbol}`, { gttSet: true });
-    toast(`${data.symbol} added to watchlist`, 'success');
+    if (gttSet) await api('PUT', \`/api/watchlist/\${data.symbol}\`, { gttSet: true });
+    toast(\`\${data.symbol} added to watchlist\`, 'success');
     updateWatchlistBadge();
   } else {
     toast(r.error || 'Failed to add', 'error');
@@ -1988,12 +2048,14 @@ async function loadWatchlist() {
 async function refreshWatchlist() {
   if (!state.watchlist.length) return;
   toast('Refreshing watchlist prices...', 'info', 2000);
+
   const symbols = state.watchlist.map(w => w.symbol);
   const r = await api('POST', '/api/stocks/batch', { symbols });
   if (!r.success) return toast('Refresh failed', 'error');
 
   const map = {};
   r.results.forEach(row => { if (row.success) map[row.symbol] = row.data; });
+
   state.watchlist.forEach(w => {
     if (map[w.symbol]) w._live = map[w.symbol];
   });
@@ -2004,70 +2066,70 @@ async function refreshWatchlist() {
 function renderWatchlist() {
   const tbody = document.getElementById('watchlist-tbody');
   if (!state.watchlist.length) {
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="8">
+    tbody.innerHTML = \`<tr class="empty-row"><td colspan="8">
       <div class="empty-state">
         <div class="empty-state-icon">👁</div>
         <div class="empty-state-title">Watchlist is empty</div>
         <div class="empty-state-desc">Add stocks from the Scanner or use the + Add Stock button</div>
-      </div></td></tr>`;
+      </div></td></tr>\`;
     return;
   }
 
   tbody.innerHTML = state.watchlist.map(w => {
     const d = w._live || {};
     const chgPct = d.changePct ?? null;
-    return `
+    return \`
     <tr>
       <td>
         <div class="symbol-cell">
-          <span class="sym-name">${w.symbol}</span>
-          <span class="sym-sub">${(d.name||w.notes||'').slice(0,28)}</span>
+          <span class="sym-name">\${w.symbol}</span>
+          <span class="sym-sub">\${(d.name||w.notes||'').slice(0,28)}</span>
         </div>
       </td>
-      <td class="num">${fmtCurr(d.currentPrice)}</td>
-      <td class="num">${fmtCurr(d.dayLow)}</td>
-      <td class="num">${fmtCurr(d.low20)}</td>
-      <td class="num" style="color:var(--gold);font-weight:700">${fmtCurr(d.high20)}</td>
-      <td class="num ${clsChg(chgPct)}">${chgPct != null ? pct(chgPct) : '—'}</td>
+      <td class="num">\${fmtCurr(d.currentPrice)}</td>
+      <td class="num">\${fmtCurr(d.dayLow)}</td>
+      <td class="num">\${fmtCurr(d.low20)}</td>
+      <td class="num" style="color:var(--gold);font-weight:700">\${fmtCurr(d.high20)}</td>
+      <td class="num \${clsChg(chgPct)}">\${chgPct != null ? pct(chgPct) : '—'}</td>
       <td>
-        ${w.gttSet
+        \${w.gttSet
           ? '<span class="badge badge-gtt">✅ GTT Set</span>'
           : '<span class="badge badge-watch">⏳ Watching</span>'
         }
       </td>
       <td class="actions" style="display:flex;gap:6px;justify-content:flex-end">
-        <button class="btn btn-sm" onclick="refreshSingleWatch('${w.symbol}')">🔄</button>
-        <button class="btn btn-sm ${w.gttSet ? '' : 'btn-green'}" onclick="toggleGTT('${w.symbol}', ${!w.gttSet})">
-          ${w.gttSet ? 'GTT ✓' : 'Set GTT'}
+        <button class="btn btn-sm" onclick="refreshSingleWatch('\${w.symbol}')">🔄</button>
+        <button class="btn btn-sm \${w.gttSet ? '' : 'btn-green'}" onclick="toggleGTT('\${w.symbol}', \${!w.gttSet})">
+          \${w.gttSet ? 'GTT ✓' : 'Set GTT'}
         </button>
-        <button class="btn btn-sm btn-primary" onclick="watchToPosition('${w.symbol}', ${d.currentPrice||0})">Buy</button>
-        <button class="btn btn-sm btn-red" onclick="removeFromWatchlist('${w.symbol}')">✕</button>
+        <button class="btn btn-sm btn-primary" onclick="watchToPosition('\${w.symbol}', \${d.currentPrice||0})">Buy</button>
+        <button class="btn btn-sm btn-red" onclick="removeFromWatchlist('\${w.symbol}')">✕</button>
       </td>
-    </tr>`;
+    </tr>\`;
   }).join('');
 }
 
 async function refreshSingleWatch(symbol) {
-  const r = await api('GET', `/api/stock/${symbol}`);
-  if (!r.success) return toast(`Failed to refresh ${symbol}`, 'error');
+  const r = await api('GET', \`/api/stock/\${symbol}\`);
+  if (!r.success) return toast(\`Failed to refresh \${symbol}\`, 'error');
   const w = state.watchlist.find(x => x.symbol === symbol);
   if (w) { w._live = r.data; renderWatchlist(); }
-  toast(`${symbol} refreshed`, 'success', 2000);
+  toast(\`\${symbol} refreshed\`, 'success', 2000);
 }
 
 async function toggleGTT(symbol, gttSet) {
-  await api('PUT', `/api/watchlist/${symbol}`, { gttSet });
+  await api('PUT', \`/api/watchlist/\${symbol}\`, { gttSet });
   const w = state.watchlist.find(x => x.symbol === symbol);
   if (w) { w.gttSet = gttSet; renderWatchlist(); }
 }
 
 async function removeFromWatchlist(symbol) {
-  if (!confirm(`Remove ${symbol} from watchlist?`)) return;
-  await api('DELETE', `/api/watchlist/${symbol}`);
+  if (!confirm(\`Remove \${symbol} from watchlist?\`)) return;
+  await api('DELETE', \`/api/watchlist/\${symbol}\`);
   state.watchlist = state.watchlist.filter(w => w.symbol !== symbol);
   renderWatchlist();
   updateWatchlistBadge();
-  toast(`${symbol} removed`, 'info');
+  toast(\`\${symbol} removed\`, 'info');
 }
 
 function openAddWatchModal() {
@@ -2082,7 +2144,7 @@ async function addToWatchlist() {
   if (!sym) return toast('Enter a symbol', 'error');
   const r = await api('POST', '/api/watchlist', { symbol: sym, notes });
   if (r.success) {
-    toast(`${sym} added to watchlist`, 'success');
+    toast(\`\${sym} added to watchlist\`, 'success');
     closeModal('modal-addwatch');
     loadWatchlist();
   } else {
@@ -2107,6 +2169,7 @@ function updateWatchlistBadge() {
 //  POSITIONS
 // ═══════════════════════════════════════════════════════
 const TARGET_PCT = [20, 15, 10, 5];
+
 async function loadPositions() {
   const r = await api('GET', '/api/positions');
   if (!r.success) return;
@@ -2135,17 +2198,18 @@ function renderPositions() {
 
   const open = state.positions.filter(p => p.status !== 'closed');
   if (!open.length) {
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="12">
+    tbody.innerHTML = \`<tr class="empty-row"><td colspan="12">
       <div class="empty-state">
         <div class="empty-state-icon">💼</div>
         <div class="empty-state-title">No open positions</div>
         <div class="empty-state-desc">Add a position when your GTT order triggers</div>
-      </div></td></tr>`;
+      </div></td></tr>\`;
     updatePortfolioStats(0, 0, 0);
     return;
   }
 
   let totalInvested = 0, totalCurrent = 0;
+
   tbody.innerHTML = open.map(pos => {
     const cmp = pos._cmp ?? null;
     const invested = pos.avgPrice * pos.qty;
@@ -2168,39 +2232,39 @@ function renderPositions() {
 
     const targetHit = pnlPct != null && pnlPct >= targetPct;
 
-    return `
-    <tr ${targetHit ? 'class="alert-row"' : ''}>
+    return \`
+    <tr \${targetHit ? 'class="alert-row"' : ''}>
       <td>
         <div class="symbol-cell">
-          <span class="sym-name">${pos.symbol}</span>
-          <span class="sym-sub">${pos.notes ? pos.notes.slice(0,20) : ''}</span>
+          <span class="sym-name">\${pos.symbol}</span>
+          <span class="sym-sub">\${pos.notes ? pos.notes.slice(0,20) : ''}</span>
         </div>
       </td>
-      <td class="num">${fmtCurr(pos.avgPrice)}</td>
-      <td class="num">${fmt(pos.qty, 0)}</td>
-      <td class="num">${fmtCurr(invested, 0)}</td>
-      <td class="num">${cmp != null ? fmtCurr(cmp) : '<span style="color:var(--text3)">Click 🔄</span>'}</td>
-      <td class="num ${clsChg(pnl)}">${pnl != null ? fmtCurr(pnl, 0) : '—'}</td>
-      <td class="num ${clsChg(pnlPct)}">${pnlPct != null ? pct(pnlPct) : '—'}</td>
-      <td class="num" style="color:var(--gold)">${fmtCurr(targetPrice)}</td>
-      <td class="num" style="color:var(--gold)">${targetPct}%</td>
+      <td class="num">\${fmtCurr(pos.avgPrice)}</td>
+      <td class="num">\${fmt(pos.qty, 0)}</td>
+      <td class="num">\${fmtCurr(invested, 0)}</td>
+      <td class="num">\${cmp != null ? fmtCurr(cmp) : '<span style="color:var(--text3)">Click 🔄</span>'}</td>
+      <td class="num \${clsChg(pnl)}">\${pnl != null ? fmtCurr(pnl, 0) : '—'}</td>
+      <td class="num \${clsChg(pnlPct)}">\${pnlPct != null ? pct(pnlPct) : '—'}</td>
+      <td class="num" style="color:var(--gold)">\${fmtCurr(targetPrice)}</td>
+      <td class="num" style="color:var(--gold)">\${targetPct}%</td>
       <td>
-        <div class="target-bar"><div class="target-bar-fill" style="width:${progressPct}%"></div></div>
-        <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:3px">${Math.round(progressPct)}%</div>
+        <div class="target-bar"><div class="target-bar-fill" style="width:\${progressPct}%"></div></div>
+        <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:3px">\${Math.round(progressPct)}%</div>
       </td>
       <td style="text-align:center">
-        ${avgCount > 0 ? `<span class="badge badge-open">${avgCount}×avg</span>` : '<span class="badge badge-closed">—</span>'}
-        ${targetHit ? '<span class="badge badge-hit" style="margin-top:2px">🎯 TARGET HIT</span>' : ''}
+        \${avgCount > 0 ? \`<span class="badge badge-open">\${avgCount}×avg</span>\` : '<span class="badge badge-closed">—</span>'}
+        \${targetHit ? '<span class="badge badge-hit" style="margin-top:2px">🎯 TARGET HIT</span>' : ''}
       </td>
       <td class="actions" style="display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap">
-        ${avgCount < maxAvgs
-          ? `<button class="btn btn-sm btn-green" onclick="openAverageModal('${pos.id}')">Avg↓</button>`
+        \${avgCount < maxAvgs
+          ? \`<button class="btn btn-sm btn-green" onclick="openAverageModal('\${pos.id}')">Avg↓</button>\`
           : '<span style="font-size:10px;color:var(--text3);font-family:var(--mono);align-self:center">Max avg</span>'
         }
-        <button class="btn btn-sm btn-primary" onclick="openClosePosModal('${pos.id}')">Close</button>
-        <button class="btn btn-sm btn-red" onclick="deletePosition('${pos.id}')">✕</button>
+        <button class="btn btn-sm btn-primary" onclick="openClosePosModal('\${pos.id}')">Close</button>
+        <button class="btn btn-sm btn-red" onclick="deletePosition('\${pos.id}')">✕</button>
       </td>
-    </tr>`;
+    </tr>\`;
   }).join('');
 
   const pnlTotal = totalCurrent > 0 ? totalCurrent - totalInvested : null;
@@ -2230,7 +2294,7 @@ async function addPosition() {
   if (!symbol || !buyPrice || !qty) return toast('Fill all required fields', 'error');
   const r = await api('POST', '/api/positions', { symbol, buyPrice, qty, notes });
   if (r.success) {
-    toast(`${symbol} position added — target ₹${fmtCurr(r.data.targetPrice)}`, 'success');
+    toast(\`\${symbol} position added — target ₹\${fmtCurr(r.data.targetPrice)}\`, 'success');
     closeModal('modal-addpos');
     loadPositions();
   } else {
@@ -2244,17 +2308,17 @@ function openAverageModal(posId) {
   state.avgTargetId = posId;
   const nextAvg = (pos.averageCount || 0) + 1;
   const newTargetPct = TARGET_PCT[Math.min(nextAvg, 3)];
-  document.getElementById('avg-info').innerHTML = `
+  document.getElementById('avg-info').innerHTML = \`
     <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px">
       <div style="font-family:var(--mono);font-size:12px;color:var(--text2)">
-        <strong>${pos.symbol}</strong> · Current avg: ₹${fmt(pos.avgPrice)} · Avg #${pos.averageCount||0}/${3}
+        <strong>\${pos.symbol}</strong> · Current avg: ₹\${fmt(pos.avgPrice)} · Avg #\${pos.averageCount||0}/\${3}
       </div>
       <div style="font-family:var(--mono);font-size:11px;color:var(--text3);margin-top:4px">
-        After averaging: target reduces to <strong style="color:var(--gold)">${newTargetPct}%</strong>
+        After averaging: target reduces to <strong style="color:var(--gold)">\${newTargetPct}%</strong>
       </div>
-    </div>`;
+    </div>\`;
   document.getElementById('avg-hint').textContent =
-    `This will be Average #${nextAvg}. New target: ${newTargetPct}%`;
+    \`This will be Average #\${nextAvg}. New target: \${newTargetPct}%\`;
   document.getElementById('avg-price').value = '';
   document.getElementById('avg-qty').value = '';
   openModal('modal-average');
@@ -2264,9 +2328,9 @@ async function submitAverage() {
   const price = parseFloat(document.getElementById('avg-price').value);
   const qty   = parseFloat(document.getElementById('avg-qty').value);
   if (!price || !qty) return toast('Enter price and qty', 'error');
-  const r = await api('POST', `/api/positions/${state.avgTargetId}/average`, { price, qty });
+  const r = await api('POST', \`/api/positions/\${state.avgTargetId}/average\`, { price, qty });
   if (r.success) {
-    toast(`Averaged down — new avg ₹${fmt(r.data.avgPrice)}, target ${r.data.targetPct}%`, 'success');
+    toast(\`Averaged down — new avg ₹\${fmt(r.data.avgPrice)}, target \${r.data.targetPct}%\`, 'success');
     closeModal('modal-average');
     loadPositions();
   } else {
@@ -2278,11 +2342,11 @@ function openClosePosModal(posId) {
   const pos = state.positions.find(p => p.id === posId);
   if (!pos) return;
   state.closePosId = posId;
-  document.getElementById('close-pos-info').innerHTML = `
+  document.getElementById('close-pos-info').innerHTML = \`
     <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px;font-family:var(--mono);font-size:12px">
-      <div><strong>${pos.symbol}</strong> · Avg buy: ₹${fmt(pos.avgPrice)} · Qty: ${fmt(pos.qty,0)}</div>
-      <div style="color:var(--gold);margin-top:4px">Target: ₹${fmt(pos.targetPrice)} (+${pos.targetPct}%)</div>
-    </div>`;
+      <div><strong>\${pos.symbol}</strong> · Avg buy: ₹\${fmt(pos.avgPrice)} · Qty: \${fmt(pos.qty,0)}</div>
+      <div style="color:var(--gold);margin-top:4px">Target: ₹\${fmt(pos.targetPrice)} (+\${pos.targetPct}%)</div>
+    </div>\`;
   document.getElementById('close-price').value = pos._cmp || '';
   openModal('modal-close-pos');
 }
@@ -2290,11 +2354,11 @@ function openClosePosModal(posId) {
 async function submitClosePosition() {
   const exitPrice = parseFloat(document.getElementById('close-price').value);
   if (!exitPrice) return toast('Enter exit price', 'error');
-  const r = await api('PUT', `/api/positions/${state.closePosId}`, { status: 'closed', exitPrice, closedAt: new Date().toISOString() });
+  const r = await api('PUT', \`/api/positions/\${state.closePosId}\`, { status: 'closed', exitPrice, closedAt: new Date().toISOString() });
   if (r.success) {
     const pos = state.positions.find(p => p.id === state.closePosId);
     const pnl = pos ? (exitPrice - pos.avgPrice) * pos.qty : 0;
-    toast(`Position closed · P&L: ${fmtCurr(pnl, 0)}`, pnl >= 0 ? 'success' : 'error');
+    toast(\`Position closed · P&L: \${fmtCurr(pnl, 0)}\`, pnl >= 0 ? 'success' : 'error');
     closeModal('modal-close-pos');
     loadPositions();
   } else {
@@ -2304,8 +2368,8 @@ async function submitClosePosition() {
 
 async function deletePosition(posId) {
   const pos = state.positions.find(p => p.id === posId);
-  if (!confirm(`Delete ${pos?.symbol} position?`)) return;
-  await api('DELETE', `/api/positions/${posId}`);
+  if (!confirm(\`Delete \${pos?.symbol} position?\`)) return;
+  await api('DELETE', \`/api/positions/\${posId}\`);
   toast('Position deleted', 'info');
   loadPositions();
 }
@@ -2342,6 +2406,7 @@ const NIFTY50 = [
   'SUNPHARMA','TATACONSUM','TATAMOTORS','TATASTEEL','TCS',
   'TECHM','TITAN','TRENT','ULTRACEMCO','WIPRO'
 ];
+
 // ── Nifty Next 50 — updated from Mahesh Kaushik sheet + official NSE list ────
 // UPL, GLAND, GICRE, ALKEM, SBICARD, AUROPHARMA, NMDC, INDIGO added (were missing)
 const NIFTY_NEXT50 = [
@@ -2358,11 +2423,13 @@ const NIFTY_NEXT50 = [
   'UNIONBANK','UPL','VBL','VEDL','VOLTAS',
   'ZOMATO','ZYDUSLIFE'
 ];
+
 const STOCK_UNIVERSE = {
   'NIFTY50': NIFTY50,
   'NIFTYNEXT50': NIFTY_NEXT50,
   'NIFTY100': [...new Set([...NIFTY50, ...NIFTY_NEXT50])]
 };
+
 // ─────────────────────────────────────────────
 //  DATA PERSISTENCE
 // ─────────────────────────────────────────────
@@ -2399,16 +2466,21 @@ const YF_HEADERS = {
   'Referer': 'https://finance.yahoo.com/',
   'Origin': 'https://finance.yahoo.com',
 };
+
 async function get20DayData(symbol) {
   const ticker = symbol.includes('.') ? symbol : `${symbol}.NS`;
+
   // 40 calendar days → guaranteed ≥20 trading days
   const now  = Math.floor(Date.now() / 1000);
   const past = now - 40 * 24 * 60 * 60;
+
   // v8/finance/chart — no auth needed, returns OHLCV + meta in one shot
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}` +
     `?period1=${past}&period2=${now}&interval=1d&includePrePost=false&corsDomain=finance.yahoo.com`;
+
   const res = await fetch(url, { headers: YF_HEADERS });
   if (!res.ok) throw new Error(`Yahoo HTTP ${res.status} for ${ticker}`);
+
   const data   = await res.json();
   const result = data?.chart?.result?.[0];
   if (!result) {
@@ -2419,6 +2491,7 @@ async function get20DayData(symbol) {
   // ── OHLCV history ──────────────────────────
   const timestamps = result.timestamp || [];
   const ohlcv      = result.indicators?.quote?.[0] || {};
+
   const history = timestamps.map((ts, i) => ({
     date:   new Date(ts * 1000),
     open:   ohlcv.open?.[i],
@@ -2427,12 +2500,14 @@ async function get20DayData(symbol) {
     close:  ohlcv.close?.[i],
     volume: ohlcv.volume?.[i],
   })).filter(d => d.high != null && d.low != null);
+
   if (history.length < 5) {
     throw new Error(`Only ${history.length} trading days found for ${symbol}`);
   }
 
   // ── Meta / real-time fields from chart.meta ─
   const meta = result.meta || {};
+
   // Most recent first, take last 20 trading days
   const sorted = [...history].sort((a, b) => b.date - a.date);
   const last20 = sorted.slice(0, 20);
@@ -2442,19 +2517,22 @@ async function get20DayData(symbol) {
   const low20  = Math.min(...last20.map(d => d.low));
 
   // Current price: regularMarketPrice from meta, else last close
-  const currentPrice = meta.regularMarketPrice ??
-    meta.chartPreviousClose ?? today.close;
+  const currentPrice = meta.regularMarketPrice ?? meta.chartPreviousClose ?? today.close;
   const prevClose    = meta.chartPreviousClose ?? sorted[1]?.close;
   const change       = prevClose ? currentPrice - prevClose : 0;
   const changePct    = prevClose ? (change / prevClose) * 100 : 0;
+
   // Intraday low from meta when market is open, else last bar low
   const todayLow = meta.regularMarketDayLow ?? today.low;
+
+  // Match: today low within 0.15% of 20-day low
   // Match: today's low within 0.05% of 20-day low.
   // Excel uses strict equality (D=E) with Google Finance data.
   // We allow a tiny 0.05% buffer to account for Yahoo vs Google Finance
   // rounding differences — tight enough to avoid false positives like DIVISLAB
   // (0.135% away) while catching genuine exact-low matches like UPL (0.00%).
   const isAt20DayLow = Math.abs(todayLow - low20) / low20 <= 0.0005;
+
   return {
     symbol,
     ticker,
@@ -2487,6 +2565,7 @@ app.get('/api/stock/:symbol', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
 // Multi-stock fetch
 app.post('/api/stocks/batch', async (req, res) => {
   const { symbols } = req.body;
@@ -2505,6 +2584,7 @@ app.post('/api/stocks/batch', async (req, res) => {
   }
   res.json({ success: true, results });
 });
+
 // SSE Scan — streams progress to client
 app.get('/api/scan/:index', async (req, res) => {
   const indexKey = req.params.index.toUpperCase();
@@ -2549,6 +2629,7 @@ app.get('/api/indexes', (req, res) => {
     }))
   });
 });
+
 // ─────────────────────────────────────────────
 //  ROUTES — WATCHLIST
 // ─────────────────────────────────────────────
@@ -2556,6 +2637,7 @@ app.get('/api/watchlist', async (req, res) => {
   const data = await loadData();
   res.json({ success: true, data: data.watchlist || [] });
 });
+
 app.post('/api/watchlist', async (req, res) => {
   const { symbol } = req.body;
   if (!symbol) return res.status(400).json({ success: false, error: 'symbol required' });
@@ -2572,6 +2654,7 @@ app.post('/api/watchlist', async (req, res) => {
   }
   res.json({ success: true });
 });
+
 app.put('/api/watchlist/:symbol', async (req, res) => {
   const data = await loadData();
   const idx = (data.watchlist || []).findIndex(w => w.symbol === req.params.symbol.toUpperCase());
@@ -2580,12 +2663,14 @@ app.put('/api/watchlist/:symbol', async (req, res) => {
   await saveData(data);
   res.json({ success: true, data: data.watchlist[idx] });
 });
+
 app.delete('/api/watchlist/:symbol', async (req, res) => {
   const data = await loadData();
   data.watchlist = (data.watchlist || []).filter(w => w.symbol !== req.params.symbol.toUpperCase());
   await saveData(data);
   res.json({ success: true });
 });
+
 // ─────────────────────────────────────────────
 //  ROUTES — POSITIONS
 // ─────────────────────────────────────────────
@@ -2601,6 +2686,7 @@ app.get('/api/positions', async (req, res) => {
   const data = await loadData();
   res.json({ success: true, data: data.positions || [] });
 });
+
 app.post('/api/positions', async (req, res) => {
   const { symbol, buyPrice, qty, notes } = req.body;
   if (!symbol || !buyPrice || !qty) {
@@ -2635,6 +2721,7 @@ app.post('/api/positions', async (req, res) => {
   await saveData(data);
   res.json({ success: true, data: pos });
 });
+
 // Average down
 app.post('/api/positions/:id/average', async (req, res) => {
   const { price, qty } = req.body;
@@ -2682,12 +2769,14 @@ app.put('/api/positions/:id', async (req, res) => {
   await saveData(data);
   res.json({ success: true, data: data.positions[idx] });
 });
+
 app.delete('/api/positions/:id', async (req, res) => {
   const data = await loadData();
   data.positions = (data.positions || []).filter(p => p.id !== req.params.id);
   await saveData(data);
   res.json({ success: true });
 });
+
 // ─────────────────────────────────────────────
 //  BACKTEST — DHAN HISTORICAL DATA
 // ─────────────────────────────────────────────
@@ -2714,6 +2803,7 @@ const DHAN_NIFTY50_IDS = {
   'TECHM':      '13538',  'TITAN':      '3506',   'TRENT':      '1964',
   'ULTRACEMCO': '2952',   'WIPRO':      '3787',
 };
+
 // ── Nifty Next 50 Dhan security IDs ─────────────────────────────────────────
 const DHAN_NEXT50_IDS = {
   'ABB':        '13',     'ADANIGREEN': '542424', 'ADANIPOWER': '532978',
@@ -2736,13 +2826,16 @@ const DHAN_NEXT50_IDS = {
   'UPL':        '512070', 'VBL':        '544171', 'VEDL':       '500295',
   'VOLTAS':     '500575', 'ZOMATO':     '543320', 'ZYDUSLIFE':  '539838',
 };
+
 // Combined lookup used internally
 const DHAN_SECURITY_IDS = { ...DHAN_NIFTY50_IDS, ...DHAN_NEXT50_IDS };
+
 // Universe → symbol list mapping (used by both Dhan and Bhavcopy routes)
 const BT_UNIVERSES = {
   'NIFTY50':  Object.keys(DHAN_NIFTY50_IDS),
   'NIFTY100': [...new Set([...Object.keys(DHAN_NIFTY50_IDS), ...Object.keys(DHAN_NEXT50_IDS)])],
 };
+
 async function fetchDhanHistory(securityId, accessToken, fromDate, toDate) {
   const res = await fetch('https://api.dhan.co/v2/charts/historical', {
     method: 'POST',
@@ -2760,6 +2853,7 @@ async function fetchDhanHistory(securityId, accessToken, fromDate, toDate) {
       toDate,
     }),
   });
+
   if (!res.ok) {
     const txt = await res.text().catch(() => res.statusText);
     throw new Error(`Dhan ${res.status}: ${txt.slice(0, 120)}`);
@@ -2828,18 +2922,21 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
           volFilter = 'none', rsiFilter = 'none',
           maxAverages = 3,
           targetPcts = [0.20, 0.15, 0.10, 0.05] } = opts;
+
   const TOLERANCE     = 0.005;
   const needMA        = maType !== 'none';
   const need52W       = w52filter !== 'none';
   const needVol       = volFilter !== 'none';
   const needRSI       = rsiFilter !== 'none';
   const volMult       = parseFloat(volFilter) || 1;
-  let   runningCapital = initialCapital;
+  let   runningCapital = initialCapital;          // compounds as trades close
 
   const trades = [];
   let pos = null, gtt = null;
+
+  // Warmup: need enough rows for longest indicator
   const warmup = Math.max(20, needMA ? maPeriod + 5 : 0, need52W ? 252 : 0, needRSI ? 20 : 0);
-  
+
   for (let i = warmup; i < rows.length; i++) {
     const today  = rows[i];
     const w20    = rows.slice(i - 20, i);
@@ -2849,21 +2946,21 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
     if (d < fromDate) continue;
 
     if (pos !== null) {
+      // Track all-time high (for retrospective target check after averaging)
       if (today.high > pos.maxHigh) pos.maxHigh = today.high;
+      // Also track high since last average (true post-average peak for reporting)
       if (today.high > pos.maxHighAfterAvg) pos.maxHighAfterAvg = today.high;
 
       const tp  = targetPcts[Math.min(pos.avgCount, targetPcts.length - 1)];
       const tgt = pos.avgPrice * (1 + tp);
       const holdDays = Math.round((new Date(d) - new Date(pos.entryDate)) / 86400000);
 
-      // 1. Target Exit (Fixed gap-ups)
       if (today.high >= tgt) {
-        const exitPrice = Math.max(today.open, tgt); // Actual fill price if gapped
         const qty = pos.totalInvested / pos.avgPrice;
-        const pnl = +((exitPrice - pos.avgPrice) * qty).toFixed(2);
-        runningCapital += pnl; 
-        trades.push({ symbol, entry_date: pos.entryDate, entry_price: +pos.initialPrice.toFixed(2), avg_price: +pos.avgPrice.toFixed(2),
-          exit_date: d, exit_price: +exitPrice.toFixed(2), invested: +pos.totalInvested.toFixed(2),
+        const pnl = +((tgt - pos.avgPrice) * qty).toFixed(2);
+        runningCapital += pnl;                    // ← add profit back to capital
+        trades.push({ symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
+          exit_date: d, exit_price: +tgt.toFixed(2), invested: +pos.totalInvested.toFixed(2),
           pnl,
           avg_count: pos.avgCount, exit_reason: 'TARGET',
           hold_days: holdDays, target_pct: +(tp * 100).toFixed(1),
@@ -2871,39 +2968,70 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
         pos = null; gtt = null; continue;
       }
 
-      // 2. Averaging Logic (Fixed gap-ups and time-machine bug)
       if (pos.avgCount < maxAverages) {
         const atLow = Math.abs(today.low - low20) / low20 <= TOLERANCE;
         if (atLow) gtt = { trigger: high20, avg: true };
       }
-      
       if (gtt && gtt.avg) {
         gtt.trigger = high20;
         if (today.high >= gtt.trigger) {
-          const ap        = Math.max(today.open, gtt.trigger); // Handle gap-ups over trigger
+          // Actual fill = trigger price OR today's open if stock gapped up above trigger.
+          // A gap-up means the stock never traded AT trigger — real fill is today.open.
+          const ap        = Math.max(gtt.trigger, today.open);
           const tradeSize = runningCapital * (riskPct / 100);
           const oldQty    = pos.totalInvested / pos.avgPrice;
           const newQty    = tradeSize / ap;
           pos.avgCount++;
           pos.avgPrice      = (pos.totalInvested + tradeSize) / (oldQty + newQty);
           pos.totalInvested += tradeSize;
+          // Reset maxHighAfterAvg so maxProfitPct only reflects post-average peak
           pos.maxHighAfterAvg = ap;
+          pos.lastAvgIdx      = i;  // remember which row this average fired on
           gtt = null;
 
-          // Check if today's high organically hit the newly lowered target
+          // ── FIX: After averaging, the new (lower) target may already be
+          //    surpassed by a historical high from a prior day. Scan forward
+          //    from the PREVIOUS average (or entry) to find the ACTUAL day
+          //    the stock first crossed newTgt — use that day's date and price. ─
           const newTp  = targetPcts[Math.min(pos.avgCount, targetPcts.length - 1)];
           const newTgt = pos.avgPrice * (1 + newTp);
-          if (today.high >= newTgt) {
-            const exitPrice = Math.max(today.open, newTgt);
-            const qty2 = pos.totalInvested / pos.avgPrice;
-            const pnl2 = +((exitPrice - pos.avgPrice) * qty2).toFixed(2);
+          if (pos.maxHigh >= newTgt) {
+            // Scan rows from (lastAvgIdx of PREVIOUS avg) up to today (exclusive)
+            // to find the first bar where high >= newTgt
+            const scanFrom = pos.lastAvgIdx; // already updated to i above, so look before i
+            let exitRow = null;
+            for (let k = scanFrom - 1; k >= (scanFrom - 500) && k >= warmup; k--) {
+              // We want the FIRST day (chronologically) where high >= newTgt
+              // after the previous average. Walk backwards to find the boundary,
+              // then forward-scan from there.
+              if (rows[k].date < pos.entryDate) break;
+              if (rows[k].high >= newTgt) exitRow = rows[k];
+              else break; // once we go below, stop — we've found the earliest crossing
+            }
+            // If no earlier crossing found, walk forward from lastAvgIdx-1 to i-1
+            if (!exitRow) {
+              for (let k = Math.max(warmup, pos.lastAvgIdx - 500); k < i; k++) {
+                if (rows[k].date >= pos.entryDate && rows[k].high >= newTgt) {
+                  exitRow = rows[k];
+                  break;
+                }
+              }
+            }
+            // Fallback: use today if somehow still not found
+            if (!exitRow) exitRow = today;
+
+            const exitDate  = exitRow.date;
+            const exitPrice = +Math.min(exitRow.high, newTgt).toFixed(2);
+            const exitHold  = Math.round((new Date(exitDate) - new Date(pos.entryDate)) / 86400000);
+            const qty2  = pos.totalInvested / pos.avgPrice;
+            const pnl2  = +((exitPrice - pos.avgPrice) * qty2).toFixed(2);
             runningCapital += pnl2;
             trades.push({
-              symbol, entry_date: pos.entryDate, entry_price: +pos.initialPrice.toFixed(2), avg_price: +pos.avgPrice.toFixed(2),
-              exit_date: d, exit_price: +exitPrice.toFixed(2),
+              symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
+              exit_date: exitDate, exit_price: exitPrice,
               invested: +pos.totalInvested.toFixed(2), pnl: pnl2,
               avg_count: pos.avgCount, exit_reason: 'TARGET',
-              hold_days: holdDays, target_pct: +(newTp * 100).toFixed(1),
+              hold_days: exitHold, target_pct: +(newTp * 100).toFixed(1),
               capital_after: +runningCapital.toFixed(2),
             });
             pos = null; gtt = null; continue;
@@ -2913,9 +3041,11 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
       continue;
     }
 
+    // ── No open position: check if pending GTT fires today (before signal check) ──
     if (gtt && !gtt.avg) {
-      gtt.trigger = high20;
+      gtt.trigger = high20; // keep GTT updated to rolling 20D high
       if (today.high >= gtt.trigger) {
+        // Apply entry filters before firing GTT
         let blocked = false;
         if (needMA) {
           const ma = maType === 'sma' ? calcSMA(rows, maPeriod, i) : calcEMA(rows, maPeriod, i);
@@ -2937,37 +3067,47 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
             if (rsiFilter === 'os30' && rsi >= 30) { gtt = null; blocked = true; }
           }
         }
-        
-        // 3. Initial Buy (Fixed gap-ups & separated initial vs avg price)
         if (!blocked) {
-          const tradeSize = runningCapital * (riskPct / 100);
-          const fillPrice = Math.max(today.open, gtt.trigger);
-          pos = { entryDate: d, avgPrice: fillPrice, initialPrice: fillPrice,
+          const tradeSize  = runningCapital * (riskPct / 100);
+          // Actual fill = trigger price OR today's open if stock gapped up above trigger.
+          // A gap-up means the stock never traded AT the 20D-high trigger price —
+          // the real execution would be at today's open (the first available price).
+          const fillPrice  = Math.max(gtt.trigger, today.open);
+          pos = { entryDate: d, avgPrice: fillPrice,
                   totalInvested: tradeSize, avgCount: 0,
                   maxHigh: fillPrice,
-                  maxHighAfterAvg: fillPrice };
+                  maxHighAfterAvg: fillPrice,   // resets on each average
+                  lastAvgIdx: i };              // row index of last buy/avg
           gtt = null;
           continue;
         }
       }
     }
 
+    // ── Check if today is a new 20D low signal — set/refresh GTT ──────────────
     const atLow = Math.abs(today.low - low20) / low20 <= TOLERANCE;
-    if (!atLow) continue;
+    if (!atLow) continue; // nothing to do today
 
+    // MA filter — only set GTT if stock is in uptrend
     if (needMA) {
       const ma = maType === 'sma' ? calcSMA(rows, maPeriod, i) : calcEMA(rows, maPeriod, i);
       if (ma !== null && today.close < ma) { gtt = null; continue; }
     }
+
+    // 52W low filter
     if (need52W && i >= 252) {
       const { low52 } = calc52WRange(rows, i);
       if (w52filter === 'near'  && today.close > low52 * 1.10) { gtt = null; continue; }
       if (w52filter === 'below' && today.close > low52)         { gtt = null; continue; }
     }
+
+    // Volume filter
     if (needVol && today.volume) {
       const avgVol = calcAvgVolume(rows, 20, i);
       if (avgVol && today.volume < avgVol * volMult) { gtt = null; continue; }
     }
+
+    // RSI filter
     if (needRSI) {
       const rsi = calcRSI(rows, 14, i);
       if (rsi !== null) {
@@ -2976,21 +3116,23 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
       }
     }
 
+    // Set/update GTT with today's 20D high as trigger
     gtt = { trigger: high20, avg: false };
   }
 
-  // 4. Force Close at End (Pushing both entry and avg prices)
   if (pos) {
     const last = rows[rows.length - 1];
     const ep   = last.close;
     const qty  = pos.totalInvested / pos.avgPrice;
     const tp   = targetPcts[Math.min(pos.avgCount, targetPcts.length - 1)];
     const holdDays = Math.round((new Date(last.date) - new Date(pos.entryDate)) / 86400000);
+    // Use maxHighAfterAvg (reset on each average) for an accurate
+    // post-average peak % — avoids inflating the figure with pre-average highs
     const peakForReport = pos.maxHighAfterAvg || pos.maxHigh;
     const maxProfitPct  = peakForReport > pos.avgPrice
       ? +((peakForReport - pos.avgPrice) / pos.avgPrice * 100).toFixed(2)
       : 0;
-    trades.push({ symbol, entry_date: pos.entryDate, entry_price: +pos.initialPrice.toFixed(2), avg_price: +pos.avgPrice.toFixed(2),
+    trades.push({ symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
       exit_date: last.date, exit_price: +ep.toFixed(2), invested: +pos.totalInvested.toFixed(2),
       pnl: +((ep - pos.avgPrice) * qty).toFixed(2),
       avg_count: pos.avgCount, exit_reason: 'OPEN',
@@ -3008,6 +3150,7 @@ function attachCapitalTracking(allTrades, startCapital) {
   const closed = allTrades
     .filter(t => t.exit_reason !== 'OPEN')
     .sort((a, b) => a.exit_date.localeCompare(b.exit_date));
+
   let running = startCapital, minCap = startCapital, minDate = '';
   for (const t of closed) {
     running += t.pnl;
@@ -3045,6 +3188,7 @@ app.get('/api/backtest/run', async (req, res) => {
   res.flushHeaders();
 
   const send = obj => { res.write('data: ' + JSON.stringify(obj) + '\n\n'); if (res.flush) res.flush(); };
+
   const symbols = BT_UNIVERSES[universe] || BT_UNIVERSES['NIFTY50'];
   const allTrades = [];
   // Fetch data slightly before fromDate for 20-day warmup
@@ -3056,6 +3200,7 @@ app.get('/api/backtest/run', async (req, res) => {
     const sym    = symbols[i];
     const secId  = DHAN_SECURITY_IDS[sym];
     let   status = 'OK', error = null, trades = [];
+
     try {
       const rows = await fetchDhanHistory(secId, token, fetchFrom, toDate);
       if (rows.length < 25) throw new Error(`Only ${rows.length} candles`);
@@ -3075,6 +3220,7 @@ app.get('/api/backtest/run', async (req, res) => {
 
   // Attach chronological capital tracking
   const capStats = attachCapitalTracking(allTrades, cap);
+
   // Aggregate summary — use compounded P&L for final value
   const closed   = allTrades.filter(t => t.exit_reason !== 'OPEN');
   const open_t   = allTrades.filter(t => t.exit_reason === 'OPEN');
@@ -3089,6 +3235,7 @@ app.get('/api/backtest/run', async (req, res) => {
   const avgLoss  = losses.length ? losses.reduce((s,t)=>s+t.pnl,0)/losses.length : 0;
   const avgHoldW = wins.length   ? wins.reduce((s,t)=>s+t.hold_days,0)/wins.length   : 0;
   const avgHoldL = losses.length ? losses.reduce((s,t)=>s+t.hold_days,0)/losses.length : 0;
+
   const byYear = {};
   for (const t of closed) {
     const y = t.exit_date.slice(0, 4);
@@ -3142,6 +3289,7 @@ const NSE_HEADERS = {
   'Referer': 'https://www.nseindia.com/',
   'Origin': 'https://www.nseindia.com',
 };
+
 // Generate URL for a given date string (YYYY-MM-DD)
 function getBhavUrl(dateStr) {
   const d = new Date(dateStr + 'T00:00:00Z');
@@ -3206,6 +3354,7 @@ function parseNewBhav(csv, symSet, dateStr) {
   const result = {};
   const lines  = csv.split('\n');
   if (lines.length < 2) return result;
+
   const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
   const iSgmt   = headers.indexOf('Sgmt');
   const iSrs    = headers.indexOf('SctySrs');
@@ -3237,8 +3386,10 @@ function parseNewBhav(csv, symSet, dateStr) {
 // Download + unzip + parse one Bhavcopy file
 async function fetchBhavcopy(dateStr, symSet) {
   const { url, format } = getBhavUrl(dateStr);
+
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 20000);
+
   try {
     const res = await fetch(url, { headers: NSE_HEADERS, signal: ctrl.signal });
     clearTimeout(timer);
@@ -3297,6 +3448,7 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
   for (const sym of symSet) stockData[sym] = [];
 
   let processed = 0, holidays = 0, errors = 0;
+
   send({ type: 'start', total, fromDate, toDate });
 
   // Download in batches of 5 concurrent requests
@@ -3311,8 +3463,7 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
         const dayData = results[j].value;
         const count   = Object.keys(dayData).length;
         if (count === 0) {
-          holidays++;
-          // trading holiday — file exists but no EQ data (unlikely), or empty
+          holidays++; // trading holiday — file exists but no EQ data (unlikely), or empty
         } else {
           processed++;
           for (const [sym, row] of Object.entries(dayData)) {
@@ -3335,10 +3486,12 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
       type: 'progress', current, total, processed, holidays, errors,
       pct: Math.round((current / total) * 100),
     });
+
     await delay(80); // brief pause between batches
   }
 
   send({ type: 'phase', message: 'Running strategy simulation...' });
+
   // Run strategy on collected data
   const allTrades = [];
   for (const sym of symSet) {
@@ -3350,6 +3503,7 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
 
   // Attach chronological capital tracking
   const capStats = attachCapitalTracking(allTrades, cap);
+
   // Aggregate — compounded P&L
   const closed   = allTrades.filter(t => t.exit_reason !== 'OPEN');
   const open_t   = allTrades.filter(t => t.exit_reason === 'OPEN');
@@ -3411,16 +3565,19 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
 });
+
 // Serve inlined HTML
 app.get('/', (req, res) => res.send(HTML_PAGE));
 app.get('*', (req, res) => {
   if (!req.path.startsWith('/api')) res.send(HTML_PAGE);
   else res.status(404).json({ error: 'Not found' });
 });
+
 // ─────────────────────────────────────────────
 //  START
 // ─────────────────────────────────────────────
 const delay = ms => new Promise(r => setTimeout(r, ms));
+
 app.listen(PORT, () => {
   console.log(`🚀 Sharegenius Swing Trader running on port ${PORT}`);
   console.log(`📁 Data file: ${DATA_FILE}`);
