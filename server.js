@@ -1613,6 +1613,7 @@ function runBacktest() {
       document.getElementById('bt-run-btn').disabled = false;
       document.getElementById('bt-progress-wrap').classList.remove('visible');
       if (msg.trades && msg.trades.length) state_bt.trades = msg.trades;
+      state_bt.lastSummary = msg.summary;   // stash for Excel export
       renderBtResults(msg.summary, msg.byYear, capital);
       renderBtAnalysis(msg.summary, msg.byYear, state_bt.trades, capital, tradeSize, filters);
       const src = msg.source === 'bhavcopy' ? 'NSE Bhavcopy' : 'Dhan API';
@@ -1677,6 +1678,21 @@ function renderBtResults(summary, byYear, capital) {
       <div class="stat-label" style="color:\${summary.min_capital && summary.min_capital < capital ? 'var(--red)' : 'var(--green)'}">⚠️ Lowest Capital</div>
       <div class="stat-value \${summary.min_capital && summary.min_capital < capital ? 'red' : 'green'}">\${fmtCurr(summary.min_capital || capital, 0)}</div>
       <div class="stat-sub">\${summary.min_capital_date ? 'on ' + summary.min_capital_date : 'Capital never dipped'}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Hold — Closed Trades</div>
+      <div class="stat-value">\${summary.avg_hold_closed || 0}d</div>
+      <div class="stat-sub">mean across all \${summary.closed_trades} closed positions</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Hold — Open Trades</div>
+      <div class="stat-value">\${summary.avg_hold_open || 0}d</div>
+      <div class="stat-sub">mean across \${summary.open_trades} open (MTM) positions</div>
+    </div>
+    <div class="stat-card" style="\${summary.open_pnl >= 0 ? '' : 'background:var(--red-bg);border-color:rgba(240,82,82,0.25);'}">
+      <div class="stat-label">Net P&amp;L — Open Trades</div>
+      <div class="stat-value \${summary.open_pnl >= 0 ? 'green' : 'red'}">\${summary.open_pnl >= 0 ? '+' : ''}\${fmtCurr(summary.open_pnl || 0, 0)}</div>
+      <div class="stat-sub">unrealised MTM across \${summary.open_trades} positions</div>
     </div>\`;
 
   document.getElementById('bt-year-tbody').innerHTML = Object.entries(byYear).map(([y, v]) => \`
@@ -1880,7 +1896,8 @@ function downloadTradeLogExcel() {
 }
 
 function _doExcelExport(trades) {
-  const startCap = state_bt.startCapital || 400000;
+  const startCap    = state_bt.startCapital || 400000;
+  const allSummary  = state_bt.lastSummary  || {};
 
   // Trade Log sheet — detect max averaging depth across all trades
   const maxAvgDepth = trades.reduce((m, t) => Math.max(m, t.avg_count || 0), 0);
@@ -1946,9 +1963,12 @@ function _doExcelExport(trades) {
     { Metric: 'Win Rate %',             Value: closed.length ? +((wins.length / closed.length) * 100).toFixed(2) : 0 },
     { Metric: 'Open (MTM)',             Value: allT.filter(t => t.exit_reason === 'OPEN').length },
     { Metric: 'Lowest Capital \u20b9',   Value: +minCap.toFixed(2) },
-    { Metric: 'TSL % Setting',          Value: tslPctSetting || 'Off' },
-    { Metric: 'Universe',               Value: state_bt_universe ? state_bt_universe.current : 'NIFTY50' },
-    { Metric: 'Exported',               Value: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) },
+    { Metric: 'Avg Hold Days — Closed',  Value: allSummary.avg_hold_closed || '' },
+    { Metric: 'Avg Hold Days — Open',    Value: allSummary.avg_hold_open   || '' },
+    { Metric: 'Net P&L — Open Trades ₹', Value: allSummary.open_pnl != null ? allSummary.open_pnl : '' },
+    { Metric: 'TSL % Setting',           Value: tslPctSetting || 'Off' },
+    { Metric: 'Universe',                Value: state_bt_universe ? state_bt_universe.current : 'NIFTY50' },
+    { Metric: 'Exported',                Value: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) },
   ];
   const wsSummary = XLSX.utils.json_to_sheet(sumRows);
   wsSummary['!cols'] = [{wch:24},{wch:22}];
@@ -3416,8 +3436,11 @@ app.get('/api/backtest/run', async (req, res) => {
   const winRate  = closed.length ? (wins.length / closed.length * 100) : 0;
   const avgWin   = wins.length   ? wins.reduce((s,t)=>s+t.pnl,0)/wins.length     : 0;
   const avgLoss  = losses.length ? losses.reduce((s,t)=>s+t.pnl,0)/losses.length : 0;
-  const avgHoldW = wins.length   ? wins.reduce((s,t)=>s+t.hold_days,0)/wins.length   : 0;
-  const avgHoldL = losses.length ? losses.reduce((s,t)=>s+t.hold_days,0)/losses.length : 0;
+  const avgHoldW      = wins.length    ? wins.reduce((s,t)=>s+t.hold_days,0)/wins.length       : 0;
+  const avgHoldL      = losses.length  ? losses.reduce((s,t)=>s+t.hold_days,0)/losses.length   : 0;
+  const avgHoldClosed = closed.length  ? closed.reduce((s,t)=>s+t.hold_days,0)/closed.length   : 0;
+  const avgHoldOpen   = open_t.length  ? open_t.reduce((s,t)=>s+t.hold_days,0)/open_t.length   : 0;
+  const openPnl       = open_t.reduce((s,t)=>s+t.pnl,0);
 
   const byYear = {};
   for (const t of closed) {
@@ -3446,8 +3469,11 @@ app.get('/api/backtest/run', async (req, res) => {
       win_rate:      +winRate.toFixed(2),
       avg_win:       +avgWin.toFixed(2),
       avg_loss:      +avgLoss.toFixed(2),
-      avg_hold_win:  +avgHoldW.toFixed(1),
-      avg_hold_loss: +avgHoldL.toFixed(1),
+      avg_hold_win:    +avgHoldW.toFixed(1),
+      avg_hold_loss:   +avgHoldL.toFixed(1),
+      avg_hold_closed: +avgHoldClosed.toFixed(1),
+      avg_hold_open:   +avgHoldOpen.toFixed(1),
+      open_pnl:        +openPnl.toFixed(2),
       min_capital:      capStats.minCapital,
       min_capital_date: capStats.minCapitalDate,
       universe,
@@ -3701,8 +3727,11 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
   const winRate  = closed.length ? (wins.length / closed.length * 100) : 0;
   const avgWin   = wins.length   ? wins.reduce((s, t) => s + t.pnl, 0) / wins.length   : 0;
   const avgLoss  = losses.length ? losses.reduce((s, t) => s + t.pnl, 0) / losses.length : 0;
-  const avgHoldW = wins.length   ? wins.reduce((s, t) => s + t.hold_days, 0) / wins.length   : 0;
-  const avgHoldL = losses.length ? losses.reduce((s, t) => s + t.hold_days, 0) / losses.length : 0;
+  const avgHoldW      = wins.length    ? wins.reduce((s, t) => s + t.hold_days, 0) / wins.length     : 0;
+  const avgHoldL      = losses.length  ? losses.reduce((s, t) => s + t.hold_days, 0) / losses.length : 0;
+  const avgHoldClosed = closed.length  ? closed.reduce((s, t) => s + t.hold_days, 0) / closed.length : 0;
+  const avgHoldOpen   = open_t.length  ? open_t.reduce((s, t) => s + t.hold_days, 0) / open_t.length : 0;
+  const openPnl       = open_t.reduce((s, t) => s + t.pnl, 0);
 
   const byYear = {};
   for (const t of closed) {
@@ -3733,8 +3762,11 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
       win_rate:      +winRate.toFixed(2),
       avg_win:       +avgWin.toFixed(2),
       avg_loss:      +avgLoss.toFixed(2),
-      avg_hold_win:  +avgHoldW.toFixed(1),
-      avg_hold_loss: +avgHoldL.toFixed(1),
+      avg_hold_win:    +avgHoldW.toFixed(1),
+      avg_hold_loss:   +avgHoldL.toFixed(1),
+      avg_hold_closed: +avgHoldClosed.toFixed(1),
+      avg_hold_open:   +avgHoldOpen.toFixed(1),
+      open_pnl:        +openPnl.toFixed(2),
       min_capital:      capStats.minCapital,
       min_capital_date: capStats.minCapitalDate,
       universe,
