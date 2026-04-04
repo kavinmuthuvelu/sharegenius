@@ -3123,7 +3123,12 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
         }
       }
 
-      if (pos.avgCount < maxAverages) {
+      // Time-based extra averages: each full year held beyond year 1 unlocks +1 avg
+      // >1yr → +1, >2yr → +2, >3yr → +3  (capped at +3 total extra)
+      const extraAvgs        = holdDays >= 1095 ? 3 : holdDays >= 730 ? 2 : holdDays >= 365 ? 1 : 0;
+      const effectiveMaxAvgs = maxAverages + extraAvgs;
+
+      if (pos.avgCount < effectiveMaxAvgs) {
         const atLow = Math.abs(today.low - low20) / low20 <= TOLERANCE;
         if (atLow) {
           // 'below_entry': only allow averaging if the GTT trigger (20D high) is
