@@ -1241,6 +1241,7 @@ const HTML_PAGE = `<!DOCTYPE html>
                 <th class="num">Entry Date</th>
                 <th class="num">Exit Date</th>
                 <th class="num">Entry ₹</th>
+                <th class="num">Avg Cost ₹</th>
                 <th class="num">Exit ₹</th>
                 <th class="num">Invested ₹</th>
                 <th class="num">Hold</th>
@@ -1827,7 +1828,7 @@ function renderBtTrades() {
 
   if (!trades.length) {
     document.getElementById('bt-trade-tbody').innerHTML =
-      '<tr class="empty-row"><td colspan="15">No trades match filter</td></tr>';
+      '<tr class="empty-row"><td colspan="16">No trades match filter</td></tr>';
     return;
   }
 
@@ -1859,6 +1860,7 @@ function renderBtTrades() {
       <td class="num">\${t.entry_date}</td>
       <td class="num">\${t.exit_date}</td>
       <td class="num">\${fmtCurr(t.entry_price)}</td>
+      <td class="num" style="color:var(--cyan)">\${fmtCurr(t.avg_cost || t.entry_price)}</td>
       <td class="num">\${fmtCurr(t.exit_price)}</td>
       <td class="num">\${fmtCurr(t.invested, 0)}</td>
       <td class="num">\${t.hold_days}d</td>
@@ -1904,9 +1906,10 @@ function _doExcelExport(trades) {
 
   const rows = trades.map(t => {
     const base = {
-      'Symbol':             t.symbol,
-      'Entry Date':         t.entry_date,
-      'Entry Price \u20b9': t.entry_price,
+      'Symbol':              t.symbol,
+      'Entry Date':          t.entry_date,
+      'Entry Price \u20b9':  t.entry_price,
+      'Avg Cost \u20b9':     t.avg_cost != null ? t.avg_cost : t.entry_price,
     };
     // One pair of columns per averaging level, right after entry
     for (let n = 0; n < maxAvgDepth; n++) {
@@ -1933,7 +1936,7 @@ function _doExcelExport(trades) {
   });
 
   const ws = XLSX.utils.json_to_sheet(rows);
-  const fixedLeft  = [{wch:14},{wch:12},{wch:14}];
+  const fixedLeft  = [{wch:14},{wch:12},{wch:14},{wch:14}];
   const avgCols    = Array.from({length: maxAvgDepth}, () => [{wch:12},{wch:14}]).flat();
   const fixedRight = [{wch:12},{wch:13},{wch:13},{wch:10},{wch:9},{wch:9},{wch:12},{wch:10},
                       {wch:10},{wch:20},{wch:22},{wch:24},{wch:14},{wch:26},{wch:16},{wch:12}];
@@ -3098,7 +3101,8 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
             const pnl    = +((exitPx - pos.avgPrice) * qty).toFixed(2);
             runningCapital += pnl;
             trades.push({
-              symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
+              symbol, entry_date: pos.entryDate, entry_price: +pos.entryPrice.toFixed(2),
+              avg_cost: +pos.avgPrice.toFixed(2),
               exit_date: d, exit_price: exitPx,
               invested: +pos.totalInvested.toFixed(2), pnl,
               avg_count: pos.avgCount, exit_reason: 'TSL',
@@ -3131,7 +3135,8 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
           const pnl = +((tgt - pos.avgPrice) * qty).toFixed(2);
           runningCapital += pnl;
           trades.push({
-            symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
+            symbol, entry_date: pos.entryDate, entry_price: +pos.entryPrice.toFixed(2),
+            avg_cost: +pos.avgPrice.toFixed(2),
             exit_date: d, exit_price: +tgt.toFixed(2),
             invested: +pos.totalInvested.toFixed(2), pnl,
             avg_count: pos.avgCount, exit_reason: 'TARGET',
@@ -3217,7 +3222,8 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
             const pnl2  = +((exitPrice - pos.avgPrice) * qty2).toFixed(2);
             runningCapital += pnl2;
             trades.push({
-              symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
+              symbol, entry_date: pos.entryDate, entry_price: +pos.entryPrice.toFixed(2),
+              avg_cost: +pos.avgPrice.toFixed(2),
               exit_date: exitDate, exit_price: exitPrice,
               invested: +pos.totalInvested.toFixed(2), pnl: pnl2,
               avg_count: pos.avgCount, exit_reason: 'TARGET',
@@ -3329,7 +3335,8 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
     const currentTslStop = (needTSL && pos.tslArmed)
       ? +(pos.tslPeak * (1 - trailSLPct / 100)).toFixed(2)
       : null;
-    trades.push({ symbol, entry_date: pos.entryDate, entry_price: +pos.avgPrice.toFixed(2),
+    trades.push({ symbol, entry_date: pos.entryDate, entry_price: +pos.entryPrice.toFixed(2),
+      avg_cost: +pos.avgPrice.toFixed(2),
       exit_date: last.date, exit_price: +ep.toFixed(2), invested: +pos.totalInvested.toFixed(2),
       pnl: +((ep - pos.avgPrice) * qty).toFixed(2),
       avg_count: pos.avgCount, exit_reason: 'OPEN',
