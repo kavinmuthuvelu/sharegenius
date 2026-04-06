@@ -691,6 +691,9 @@ const HTML_PAGE = `<!DOCTYPE html>
     <button class="tab-btn" onclick="switchTab('backtest')" id="tab-backtest">
       <span class="tab-icon">📊</span> Backtest
     </button>
+    <button class="tab-btn" onclick="switchTab('portfolio')" id="tab-portfolio">
+      <span class="tab-icon">🏦</span> Portfolio
+    </button>
   </nav>
 
   <!-- ═══════ MAIN CONTENT ══════════════════════════════ -->
@@ -1271,6 +1274,120 @@ const HTML_PAGE = `<!DOCTYPE html>
       </div>
     </div>
 
+
+    <!-- ─── PORTFOLIO PANEL ──────────────────────────────────── -->
+    <div class="panel" id="panel-portfolio">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Portfolio — Dhan Live Data</div>
+          <div class="section-subtitle">Holdings · Open Positions · Forever (GTT) Orders</div>
+        </div>
+        <div class="section-actions">
+          <button class="btn btn-primary" onclick="loadPortfolio()" id="pf-refresh-btn">
+            ↺ Refresh
+          </button>
+        </div>
+      </div>
+
+      <!-- Credentials row -->
+      <div style="display:grid;grid-template-columns:1fr 2fr auto;gap:10px;margin-bottom:16px;align-items:end;">
+        <div class="stat-card" style="padding:10px 12px;">
+          <div class="stat-label">Dhan Client ID</div>
+          <input class="form-input" id="pf-client-id" placeholder="Your Client ID" style="margin-top:4px;font-size:12px;" />
+        </div>
+        <div class="stat-card" style="padding:10px 12px;">
+          <div class="stat-label">Access Token (refreshes daily)</div>
+          <input class="form-input" id="pf-token" type="password" placeholder="Paste token" style="margin-top:4px;font-size:12px;" />
+        </div>
+        <button class="btn btn-primary" style="height:38px;" onclick="loadPortfolio()">Load Data</button>
+      </div>
+      <div class="form-hint" style="margin-bottom:16px;">
+        ℹ️ Token is used read-only — only Holdings, Positions, and GTT orders are fetched. No orders are placed.
+      </div>
+
+      <!-- Error / status -->
+      <div id="pf-error" style="display:none;background:var(--red-bg);border:1px solid var(--red);border-radius:var(--radius);padding:10px 14px;font-size:12px;font-family:var(--mono);color:var(--red);margin-bottom:12px;"></div>
+
+      <!-- Summary stat cards -->
+      <div class="stats-row" id="pf-stat-cards" style="margin-bottom:20px;display:none;"></div>
+
+      <!-- ── Holdings ──────────────────────────────────── -->
+      <div id="pf-holdings-wrap" style="display:none;margin-bottom:24px;">
+        <div class="section-title" style="font-size:15px;margin-bottom:10px;">📦 Holdings (Delivery)</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th class="num">Qty</th>
+                <th class="num">Avg Cost ₹</th>
+                <th class="num">CMP ₹</th>
+                <th class="num">Invested ₹</th>
+                <th class="num">Current ₹</th>
+                <th class="num">P&amp;L ₹</th>
+                <th class="num">Return%</th>
+              </tr>
+            </thead>
+            <tbody id="pf-holdings-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── Open Positions ────────────────────────────── -->
+      <div id="pf-positions-wrap" style="display:none;margin-bottom:24px;">
+        <div class="section-title" style="font-size:15px;margin-bottom:10px;">⚡ Open Positions (Intraday / Carryforward)</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th class="num">Qty</th>
+                <th class="num">Buy Avg ₹</th>
+                <th class="num">CMP ₹</th>
+                <th class="num">P&amp;L ₹</th>
+                <th class="num">Day P&amp;L ₹</th>
+                <th>Type</th>
+              </tr>
+            </thead>
+            <tbody id="pf-positions-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── GTT / Forever Orders ──────────────────────── -->
+      <div id="pf-gtt-wrap" style="display:none;margin-bottom:24px;">
+        <div class="section-title" style="font-size:15px;margin-bottom:10px;">🔔 Forever Orders (GTT)</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Type</th>
+                <th class="num">Qty</th>
+                <th class="num">Trigger ₹</th>
+                <th class="num">Limit ₹</th>
+                <th class="num">CMP ₹</th>
+                <th class="num">Distance%</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="pf-gtt-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Empty state -->
+      <div id="pf-empty" style="text-align:center;padding:60px 20px;color:var(--text3);">
+        <div style="font-size:40px;margin-bottom:12px;opacity:0.4;">🏦</div>
+        <div style="font-size:16px;font-weight:700;color:var(--text2);margin-bottom:6px;">Connect your Dhan account</div>
+        <div style="font-size:13px;font-family:var(--mono);line-height:1.6;">
+          Enter your Dhan Client ID + Access Token and click Load Data.<br/>
+          Holdings, open positions, and all active GTT orders will appear here.<br/>
+          <span style="color:var(--green)">✅ Read-only — no orders are placed.</span>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -1427,6 +1544,174 @@ function switchTab(tab) {
   document.getElementById('tab-' + tab).classList.add('active');
   if (tab === 'watchlist') loadWatchlist();
   if (tab === 'positions') loadPositions();
+}
+
+// ═══════════════════════════════════════════════════════
+//  PORTFOLIO — Dhan live data (read-only)
+// ═══════════════════════════════════════════════════════
+
+function getPfCreds() {
+  const clientId = document.getElementById('pf-client-id').value.trim();
+  const token    = document.getElementById('pf-token').value.trim();
+  return { clientId, token };
+}
+
+function showPfError(msg) {
+  const el = document.getElementById('pf-error');
+  el.textContent = '⚠️ ' + msg;
+  el.style.display = 'block';
+}
+
+function hidePfError() {
+  document.getElementById('pf-error').style.display = 'none';
+}
+
+async function loadPortfolio() {
+  const { clientId, token } = getPfCreds();
+  if (!token || !clientId) return toast('Enter Dhan Client ID and Access Token', 'error');
+
+  hidePfError();
+  document.getElementById('pf-empty').style.display     = 'none';
+  document.getElementById('pf-stat-cards').style.display = 'none';
+  document.getElementById('pf-holdings-wrap').style.display   = 'none';
+  document.getElementById('pf-positions-wrap').style.display  = 'none';
+  document.getElementById('pf-gtt-wrap').style.display        = 'none';
+
+  const btn = document.getElementById('pf-refresh-btn');
+  btn.innerHTML = '<span class="spinner"></span> Loading...';
+  btn.disabled  = true;
+
+  try {
+    // Fetch all 3 endpoints via our backend proxy (avoids CORS)
+    const [holdingsRes, positionsRes, gttRes] = await Promise.all([
+      fetch('/api/portfolio/holdings',  { headers: { 'x-dhan-token': token, 'x-dhan-client': clientId } }),
+      fetch('/api/portfolio/positions', { headers: { 'x-dhan-token': token, 'x-dhan-client': clientId } }),
+      fetch('/api/portfolio/gtt',       { headers: { 'x-dhan-token': token, 'x-dhan-client': clientId } }),
+    ]);
+
+    const [holdings, positions, gtt] = await Promise.all([
+      holdingsRes.json(), positionsRes.json(), gttRes.json(),
+    ]);
+
+    if (holdings.error || positions.error || gtt.error) {
+      throw new Error(holdings.error || positions.error || gtt.error);
+    }
+
+    renderPortfolio(holdings, positions, gtt);
+    toast('Portfolio loaded', 'success');
+  } catch (err) {
+    showPfError(err.message || 'Failed to load portfolio. Check token and try again.');
+    document.getElementById('pf-empty').style.display = 'block';
+  } finally {
+    btn.innerHTML = '↺ Refresh';
+    btn.disabled  = false;
+  }
+}
+
+function renderPortfolio(holdings, positions, gtt) {
+  // ── Summary cards ──────────────────────────────────────────────
+  const totalInvested  = holdings.reduce((s, h) => s + h.avgCostPrice * h.totalQty, 0);
+  const totalCurrentPx = holdings.reduce((s, h) => s + (h.cmp || h.avgCostPrice) * h.totalQty, 0);
+  const totalPnl       = totalCurrentPx - totalInvested;
+  const openPosPnl     = positions.reduce((s, p) => s + (p.unrealizedProfit || 0), 0);
+  const gttCount       = gtt.length;
+
+  document.getElementById('pf-stat-cards').style.display = '';
+  document.getElementById('pf-stat-cards').innerHTML = \`
+    <div class="stat-card">
+      <div class="stat-label">Holdings</div>
+      <div class="stat-value gold">\${holdings.length}</div>
+      <div class="stat-sub">stocks in demat</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Invested</div>
+      <div class="stat-value">\${fmtCurr(totalInvested, 0)}</div>
+      <div class="stat-sub">across all holdings</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Unrealised P&amp;L</div>
+      <div class="stat-value \${totalPnl >= 0 ? 'green' : 'red'}">\${totalPnl >= 0 ? '+' : ''}\${fmtCurr(totalPnl, 0)}</div>
+      <div class="stat-sub">\${((totalPnl / totalInvested) * 100).toFixed(1)}% overall return</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Open Positions P&amp;L</div>
+      <div class="stat-value \${openPosPnl >= 0 ? 'green' : 'red'}">\${openPosPnl >= 0 ? '+' : ''}\${fmtCurr(openPosPnl, 0)}</div>
+      <div class="stat-sub">\${positions.length} open position(s)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Active GTT Orders</div>
+      <div class="stat-value" style="color:var(--cyan)">\${gttCount}</div>
+      <div class="stat-sub">forever orders pending</div>
+    </div>\`;
+
+  // ── Holdings table ─────────────────────────────────────────────
+  if (holdings.length) {
+    document.getElementById('pf-holdings-wrap').style.display = '';
+    const holdingsSorted = [...holdings].sort((a, b) => {
+      const pnlA = ((a.cmp || a.avgCostPrice) - a.avgCostPrice) * a.totalQty;
+      const pnlB = ((b.cmp || b.avgCostPrice) - b.avgCostPrice) * b.totalQty;
+      return pnlA - pnlB; // worst first
+    });
+    document.getElementById('pf-holdings-tbody').innerHTML = holdingsSorted.map(h => {
+      const cmp      = h.cmp || h.avgCostPrice;
+      const invested = h.avgCostPrice * h.totalQty;
+      const current  = cmp * h.totalQty;
+      const pnl      = current - invested;
+      const retPct   = ((pnl / invested) * 100).toFixed(1);
+      return \`<tr class="\${pnl < 0 ? 'alert-row' : ''}">
+        <td><span class="sym-name">\${h.tradingSymbol}</span></td>
+        <td class="num">\${h.totalQty}</td>
+        <td class="num">\${fmtCurr(h.avgCostPrice)}</td>
+        <td class="num">\${fmtCurr(cmp)}</td>
+        <td class="num">\${fmtCurr(invested, 0)}</td>
+        <td class="num">\${fmtCurr(current, 0)}</td>
+        <td class="num \${pnl >= 0 ? 'up' : 'down'}">\${pnl >= 0 ? '+' : ''}\${fmtCurr(pnl, 0)}</td>
+        <td class="num \${pnl >= 0 ? 'up' : 'down'}">\${pnl >= 0 ? '+' : ''}\${retPct}%</td>
+      </tr>\`;
+    }).join('');
+  }
+
+  // ── Positions table ────────────────────────────────────────────
+  if (positions.length) {
+    document.getElementById('pf-positions-wrap').style.display = '';
+    document.getElementById('pf-positions-tbody').innerHTML = positions.map(p => {
+      const pnl    = p.unrealizedProfit || 0;
+      const dayPnl = p.realizedProfit   || 0;
+      return \`<tr>
+        <td><span class="sym-name">\${p.tradingSymbol}</span></td>
+        <td class="num">\${p.netQty}</td>
+        <td class="num">\${fmtCurr(p.buyAvg || p.costPrice || 0)}</td>
+        <td class="num">\${fmtCurr(p.lastTradedPrice || 0)}</td>
+        <td class="num \${pnl >= 0 ? 'up' : 'down'}">\${pnl >= 0 ? '+' : ''}\${fmtCurr(pnl, 0)}</td>
+        <td class="num \${dayPnl >= 0 ? 'up' : 'down'}">\${dayPnl >= 0 ? '+' : ''}\${fmtCurr(dayPnl, 0)}</td>
+        <td><span class="badge \${p.positionType === 'LONG' ? 'badge-hit' : 'badge-alert'}">\${p.positionType || '—'}</span></td>
+      </tr>\`;
+    }).join('');
+  }
+
+  // ── GTT table ──────────────────────────────────────────────────
+  if (gtt.length) {
+    document.getElementById('pf-gtt-wrap').style.display = '';
+    document.getElementById('pf-gtt-tbody').innerHTML = gtt.map(g => {
+      const cmp      = g.cmp || 0;
+      const trigger  = g.triggerPrice || 0;
+      const dist     = cmp > 0 && trigger > 0
+        ? (((trigger - cmp) / cmp) * 100).toFixed(1)
+        : '—';
+      const distNum  = parseFloat(dist);
+      const isBuy    = (g.transactionType || '').toUpperCase() === 'BUY';
+      return \`<tr>
+        <td><span class="sym-name">\${g.tradingSymbol || g.securityId}</span></td>
+        <td><span class="badge \${isBuy ? 'badge-hit' : 'badge-alert'}">\${g.transactionType || '—'}</span></td>
+        <td class="num">\${g.quantity || '—'}</td>
+        <td class="num" style="color:var(--cyan)">\${fmtCurr(trigger)}</td>
+        <td class="num">\${fmtCurr(g.price || trigger)}</td>
+        <td class="num">\${cmp > 0 ? fmtCurr(cmp) : '—'}</td>
+        <td class="num \${!isNaN(distNum) && distNum < 0 ? 'up' : ''}">\${dist}%</td>
+        <td><span class="badge badge-open">\${g.orderStatus || 'PENDING'}</span></td>
+      </tr>\`;
+    }).join('');
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -3781,6 +4066,66 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
     byYear,
   });
   res.end();
+});
+
+// ─────────────────────────────────────────────
+//  PORTFOLIO — Dhan proxy routes (read-only)
+//  Proxies requests to Dhan API to avoid CORS.
+//  Only GET endpoints — no order placement.
+// ─────────────────────────────────────────────
+
+async function dhanGet(path, token) {
+  const res = await fetch(`https://api.dhan.co/v2${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      'access-token': token,
+    },
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => res.statusText);
+    throw new Error(`Dhan ${res.status}: ${txt.slice(0, 200)}`);
+  }
+  return res.json();
+}
+
+// GET /api/portfolio/holdings
+app.get('/api/portfolio/holdings', async (req, res) => {
+  const token    = req.headers['x-dhan-token'];
+  const clientId = req.headers['x-dhan-client'];
+  if (!token || !clientId) return res.status(400).json({ error: 'Missing token' });
+  try {
+    const data = await dhanGet('/holdings', token);
+    // data is an array of holdings — inject empty cmp placeholder (no live price in this call)
+    res.json(Array.isArray(data) ? data : []);
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+
+// GET /api/portfolio/positions
+app.get('/api/portfolio/positions', async (req, res) => {
+  const token    = req.headers['x-dhan-token'];
+  const clientId = req.headers['x-dhan-client'];
+  if (!token || !clientId) return res.status(400).json({ error: 'Missing token' });
+  try {
+    const data = await dhanGet('/positions', token);
+    res.json(Array.isArray(data) ? data : []);
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+
+// GET /api/portfolio/gtt
+app.get('/api/portfolio/gtt', async (req, res) => {
+  const token    = req.headers['x-dhan-token'];
+  const clientId = req.headers['x-dhan-client'];
+  if (!token || !clientId) return res.status(400).json({ error: 'Missing token' });
+  try {
+    const data = await dhanGet('/forever/all', token);
+    res.json(Array.isArray(data) ? data : []);
+  } catch (err) {
+    res.json({ error: err.message });
+  }
 });
 
 // ─────────────────────────────────────────────
