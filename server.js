@@ -3488,49 +3488,27 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
           pos.totalInvested += tradeSize;
           // Reset maxHighAfterAvg so maxProfitPct only reflects post-average peak
           pos.maxHighAfterAvg = ap;
-          const prevLastAvgIdx = pos.lastAvgIdx;  // save BEFORE updating
           pos.lastAvgIdx      = i;  // remember which row this average fired on
           gtt = null;
 
-          // ── FIX: After averaging, the new (lower) target may already be
-          //    surpassed by a historical high from a prior day. Scan forward
-          //    from the PREVIOUS average (or entry) to find the ACTUAL day
-          //    the stock first crossed newTgt — use that day's date and price. ─
+          // Record this average now that the fill is confirmed
+          pos.avgs.push({ date: d, price: ap });
+
+          // ── Check if the new lower target is already met TODAY ────────────────
+          // After averaging down, pos.avgPrice drops and newTgt drops with it.
+          // If today's high already clears newTgt, exit today at newTgt.
+          // We do NOT scan backwards — on any historical date before this average,
+          // the avgPrice was higher and the target was different; retroactively
+          // exiting there would use a cost that didn't exist then (temporal paradox).
           const newTp  = targetPcts[Math.min(pos.avgCount, targetPcts.length - 1)];
           const newTgt = pos.avgPrice * (1 + newTp);
-          if (pos.maxHigh >= newTgt) {
-            // Scan backwards from (i-1) to find FIRST chronological day where high >= newTgt
-            // Start from prevLastAvgIdx (before this average fired), not from i.
-            const scanFrom = prevLastAvgIdx;
-            let exitRow = null;
-            for (let k = scanFrom - 1; k >= (scanFrom - 500) && k >= warmup; k--) {
-              if (rows[k].date < pos.entryDate) break;
-              if (rows[k].high >= newTgt) exitRow = rows[k];
-              else break;
-            }
-            // If no earlier crossing found, scan forward from prevLastAvgIdx to i-1
-            if (!exitRow) {
-              for (let k = Math.max(warmup, prevLastAvgIdx - 500); k < i; k++) {
-                if (rows[k].date >= pos.entryDate && rows[k].high >= newTgt) {
-                  exitRow = rows[k];
-                  break;
-                }
-              }
-            }
-            // Fallback: use today if still not found
-            if (!exitRow) exitRow = today;
-
-            const exitDate  = exitRow.date;
-            const exitPrice = +Math.min(exitRow.high, newTgt).toFixed(2);
-            const exitHold  = Math.round((new Date(exitDate) - new Date(pos.entryDate)) / 86400000);
-            const qty2  = pos.totalInvested / pos.avgPrice;
-            const pnl2  = +((exitPrice - pos.avgPrice) * qty2).toFixed(2);
+          if (today.high >= newTgt) {
+            const exitDate  = d;
+            const exitPrice = +newTgt.toFixed(2);
+            const exitHold  = holdDays;
+            const qty2      = pos.totalInvested / pos.avgPrice;
+            const pnl2      = +((exitPrice - pos.avgPrice) * qty2).toFixed(2);
             runningCapital += pnl2;
-
-            // Record this average BEFORE the push — but only if its date <= exitDate
-            // (avgs happening after the exit date belong to a future position)
-            if (d <= exitDate) pos.avgs.push({ date: d, price: ap });
-
             trades.push({
               symbol, entry_date: pos.entryDate, entry_price: +pos.entryPrice.toFixed(2),
               avg_cost: +pos.avgPrice.toFixed(2),
@@ -3539,14 +3517,11 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
               avg_count: pos.avgCount, exit_reason: 'TARGET',
               hold_days: exitHold, target_pct: +(newTp * 100).toFixed(1),
               capital_after: +runningCapital.toFixed(2),
-              // Only spread avgs whose date is on or before the exit date
-              ...spreadAvgs(pos.avgs.filter(a => a.date <= exitDate)),
+              ...spreadAvgs(pos.avgs),
             });
             pos = null; gtt = null; continue;
           }
-
-          // ── Retroactive exit did NOT fire → record this average for ongoing trade ──
-          pos.avgs.push({ date: d, price: ap });
+          // Target not yet met today — normal daily loop will catch it going forward.
         }
       }
       continue;
