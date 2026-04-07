@@ -1124,12 +1124,19 @@ const HTML_PAGE = `<!DOCTYPE html>
             <div class="form-hint">Max times to average down per trade</div>
           </div>
           <div style="min-width:260px;">
-            <label class="form-label">Averaging Mode</label>
-            <select class="form-input" id="bt-avg-mode" style="font-size:12px;padding:6px 8px;">
-              <option value="native">Native — average on any new 20D low</option>
-              <option value="below_entry">Below entry only — average only if trigger &lt; initial buy price</option>
+            <label class="form-label">Averaging Trigger</label>
+            <select class="form-input" id="bt-avg-mode" style="font-size:12px;padding:6px 8px;" onchange="onAvgModeChange()">
+              <option value="native">On any new 20D low signal</option>
+              <option value="drawdown">At fixed % drawdown from first BUY price</option>
+              <option value="below_entry">On new 20D high below first BUY price</option>
             </select>
-            <div class="form-hint" id="bt-avg-mode-hint">Current: average whenever a new 20D low signal fires</div>
+            <div class="form-hint" id="bt-avg-mode-hint">Signal fires on any new 20-day low — GTT at 20D high</div>
+          </div>
+          <!-- Drawdown level inputs (only shown when drawdown mode selected) -->
+          <div id="bt-drawdown-wrap" style="display:none;min-width:320px;">
+            <label class="form-label">Drawdown Levels (% drop from first BUY)</label>
+            <div id="bt-drawdown-container" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;"></div>
+            <div class="form-hint">One level per averaging slot, e.g. 10, 20, 30 → average at −10%, −20%, −30%</div>
           </div>
           <div style="min-width:260px;">
             <label class="form-label">Fill Price Guard</label>
@@ -1791,6 +1798,8 @@ const _HINT = ['Before any averaging','After 1 average-down','After 2 average-do
 const _DEF  = [20, 15, 10, 8, 6, 5, 4]; // default target %
 
 function onMaxAvgChange() {
+  const mode = document.getElementById('bt-avg-mode').value;
+  if (mode === 'drawdown') buildDrawdownInputs();
   const n   = parseInt(document.getElementById('bt-max-avg').value);
   const con = document.getElementById('bt-targets-container');
   const existing = con.querySelectorAll('input[data-tidx]');
@@ -1826,6 +1835,38 @@ function onTslPctChange() {
     \`Stop = peak × (1 − \${pct}%) → locks in target − \${pct}% minimum profit\`;
 }
 
+function onAvgModeChange() {
+  const mode = document.getElementById('bt-avg-mode').value;
+  const wrap = document.getElementById('bt-drawdown-wrap');
+  wrap.style.display = mode === 'drawdown' ? '' : 'none';
+  const hints = {
+    native:      'Signal fires on any new 20-day low — GTT at 20D high',
+    drawdown:    'Average when price drops the specified % below your first BUY price',
+    below_entry: 'GTT trigger (20D high) must be below first BUY price',
+  };
+  document.getElementById('bt-avg-mode-hint').textContent = hints[mode] || '';
+  if (mode === 'drawdown') buildDrawdownInputs();
+}
+
+function buildDrawdownInputs() {
+  const maxAvg = parseInt(document.getElementById('bt-max-avg').value) || 3;
+  const con    = document.getElementById('bt-drawdown-container');
+  const existing = Array.from(con.querySelectorAll('input')).map(i => parseFloat(i.value));
+  con.innerHTML  = '';
+  const defaults = [10, 20, 30, 40, 50, 60];
+  for (let n = 0; n < maxAvg; n++) {
+    const val = existing[n] != null && !isNaN(existing[n]) ? existing[n] : (defaults[n] || (n+1)*10);
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;align-items:center;gap:4px;';
+    div.innerHTML = \`<span style="font-size:11px;color:var(--text2);font-family:var(--mono);white-space:nowrap;">Avg \${n+1}:</span>
+      <input type="number" data-ddidx="\${n}" value="\${val}" min="1" max="90" step="1"
+        style="width:54px;padding:4px 6px;font-size:12px;font-weight:700;color:var(--cyan);text-align:right;"
+        class="form-input" />
+      <span style="font-size:11px;color:var(--text3);font-family:var(--mono);">%</span>\`;
+    con.appendChild(div);
+  }
+}
+
 function collectFilters() {
   const maxAvg = parseInt(document.getElementById('bt-max-avg').value);
   const targetInputs = document.querySelectorAll('#bt-targets-container input[data-tidx]');
@@ -1834,6 +1875,11 @@ function collectFilters() {
   const avgFillGuard = document.getElementById('bt-avg-fill-guard').checked;
   const tslOn   = document.getElementById('bt-tsl-mode').value === 'on';
   const trailSL = tslOn ? (parseFloat(document.getElementById('bt-tsl-pct').value) || 7) : 0;
+  // Drawdown levels — only relevant when avgMode === 'drawdown'
+  const ddInputs     = document.querySelectorAll('#bt-drawdown-container input[data-ddidx]');
+  const drawdownPcts = avgMode === 'drawdown'
+    ? Array.from(ddInputs).map(inp => parseFloat(inp.value) || 10)
+    : [];
   return {
     maType:    document.getElementById('bt-ma-type').value,
     maPeriod:  parseInt(document.getElementById('bt-ma-period').value) || 200,
@@ -1844,6 +1890,7 @@ function collectFilters() {
     targets,
     avgMode,
     avgFillGuard,
+    drawdownPcts,
     trailSL,
   };
 }
@@ -1862,7 +1909,7 @@ function runBacktest() {
   const riskPct  = riskMode === 'pct' ? riskVal : (riskVal / capital) * 100;
 
   const universe = state_bt_universe.current;
-  const fq = \`&maType=\${filters.maType}&maPeriod=\${filters.maPeriod}&w52filter=\${filters.w52filter}&volFilter=\${filters.volFilter}&rsiFilter=\${filters.rsiFilter}&maxAvg=\${filters.maxAvg}&targets=\${encodeURIComponent(filters.targets.join(','))}&riskPct=\${riskPct}&universe=\${universe}&avgMode=\${filters.avgMode}&avgFillGuard=\${filters.avgFillGuard ? '1' : '0'}&trailSL=\${filters.trailSL}\`;
+  const fq = \`&maType=\${filters.maType}&maPeriod=\${filters.maPeriod}&w52filter=\${filters.w52filter}&volFilter=\${filters.volFilter}&rsiFilter=\${filters.rsiFilter}&maxAvg=\${filters.maxAvg}&targets=\${encodeURIComponent(filters.targets.join(','))}&riskPct=\${riskPct}&universe=\${universe}&avgMode=\${filters.avgMode}&avgFillGuard=\${filters.avgFillGuard ? '1' : '0'}&drawdownPcts=\${encodeURIComponent(filters.drawdownPcts.join(','))}&trailSL=\${filters.trailSL}\`;
 
   // Also call onMaxAvgChange immediately after load to seed the dynamic rows if not yet rendered
   if (!document.querySelector('#bt-targets-container input')) onMaxAvgChange();
@@ -3352,8 +3399,9 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
           volFilter = 'none', rsiFilter = 'none',
           maxAverages = 3,
           targetPcts = [0.20, 0.15, 0.10, 0.05],
-          avgMode = 'native',          // 'native' | 'below_entry'
+          avgMode = 'native',          // 'native' | 'drawdown' | 'below_entry'
           avgFillGuard = false,        // true = block average if fill >= entryPrice
+          drawdownLevels = [],         // [10,20,30] % drops from entryPrice for drawdown mode
           trailSLPct = 0 } = opts;     // 0 = TSL off, >0 = trail % after target hit
 
   const TOLERANCE     = 0.005;
@@ -3454,23 +3502,40 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
       const effectiveMaxAvgs = maxAverages + extraAvgs;
 
       if (pos.avgCount < effectiveMaxAvgs) {
-        const atLow = Math.abs(today.low - low20) / low20 <= TOLERANCE;
-        if (atLow) {
-          // 'below_entry': only allow averaging if the GTT trigger (20D high) is
-          // strictly below the initial entry price — i.e. we'd be buying cheaper.
-          // 'native': average on any new 20D low signal regardless of price level.
-          const triggerAllowed = avgMode === 'below_entry'
-            ? high20 < pos.entryPrice
-            : true;
-          if (triggerAllowed) gtt = { trigger: high20, avg: true };
+        if (avgMode === 'drawdown') {
+          // ── Drawdown mode: average when price falls a fixed % from first BUY ──
+          // The N-th average (0-indexed) triggers when today.low <= entryPrice × (1 - level/100).
+          // Fill is at the drawdown threshold itself (limit order concept) or today.open if gap.
+          const level = drawdownLevels[pos.avgCount];  // % drop for THIS averaging slot
+          if (level != null) {
+            const ddThreshold = pos.entryPrice * (1 - level / 100);
+            if (today.low <= ddThreshold) {
+              // Signal: set a pending GTT-style order at ddThreshold
+              gtt = { trigger: ddThreshold, avg: true, drawdown: true };
+            }
+          }
+        } else {
+          // ── Native / below_entry: 20D-low signal ─────────────────────────────
+          const atLow = Math.abs(today.low - low20) / low20 <= TOLERANCE;
+          if (atLow) {
+            const triggerAllowed = avgMode === 'below_entry'
+              ? high20 < pos.entryPrice   // 20D high must be below entry
+              : true;                     // native: always allowed
+            if (triggerAllowed) gtt = { trigger: high20, avg: true };
+          }
         }
       }
       if (gtt && gtt.avg) {
-        gtt.trigger = high20;
-        if (today.high >= gtt.trigger) {
+        // Only refresh trigger for 20D-low modes; drawdown mode uses a fixed threshold
+        if (!gtt.drawdown) gtt.trigger = high20;
+        if (today.high >= gtt.trigger || (gtt.drawdown && today.low <= gtt.trigger)) {
           // Actual fill = trigger price OR today's open if stock gapped up above trigger.
           // A gap-up means the stock never traded AT trigger — real fill is today.open.
-          const ap = Math.max(gtt.trigger, today.open);
+          // Fill: for drawdown mode, fill at threshold or open (whichever is higher/lower gap)
+          // For 20D-low modes, fill at 20D-high trigger or open (gap-up protection)
+          const ap = gtt.drawdown
+            ? Math.min(gtt.trigger, Math.max(gtt.trigger, today.open))  // at threshold or open
+            : Math.max(gtt.trigger, today.open);                         // at trigger or open
 
           // Fill-price guard: if enabled, cancel this average whenever the actual
           // fill price is at or above the initial entry price — you'd be buying at
@@ -3668,14 +3733,15 @@ app.get('/api/backtest/run', async (req, res) => {
           volFilter = 'none', rsiFilter = 'none',
           maxAvg = '3', targets = '20,15,10,8,6,5,4',
           riskPct = '2', universe = 'NIFTY50', avgMode = 'native',
-          avgFillGuard = '0', trailSL = '0' } = req.query;
+          avgFillGuard = '0', drawdownPcts = '', trailSL = '0' } = req.query;
 
-  const cap         = parseFloat(capital);
-  const riskPctNum  = parseFloat(riskPct) || 2;
-  const targetPcts  = targets.split(',').map(v => parseFloat(v.trim()) / 100).filter(v => !isNaN(v));
-  const maxAverages = parseInt(maxAvg);
-  const trailSLPct  = Math.max(0, parseFloat(trailSL) || 0);
-  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', trailSLPct };
+  const cap          = parseFloat(capital);
+  const riskPctNum   = parseFloat(riskPct) || 2;
+  const targetPcts   = targets.split(',').map(v => parseFloat(v.trim()) / 100).filter(v => !isNaN(v));
+  const maxAverages  = parseInt(maxAvg);
+  const trailSLPct   = Math.max(0, parseFloat(trailSL) || 0);
+  const drawdownLevels = drawdownPcts ? drawdownPcts.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v) && v > 0) : [];
+  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', drawdownLevels, trailSLPct };
 
   if (!token || !clientId) {
     return res.status(400).json({ error: 'token and clientId required' });
@@ -3926,15 +3992,16 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
     volFilter = 'none', rsiFilter = 'none',
     maxAvg = '3', targets = '20,15,10,8,6,5,4',
     riskPct = '2', universe = 'NIFTY50', avgMode = 'native',
-    avgFillGuard = '0', trailSL = '0',
+    avgFillGuard = '0', drawdownPcts = '', trailSL = '0',
   } = req.query;
 
-  const cap         = parseFloat(capital);
-  const riskPctNum  = parseFloat(riskPct) || 2;
-  const targetPcts  = targets.split(',').map(v => parseFloat(v.trim()) / 100).filter(v => !isNaN(v));
-  const maxAverages = parseInt(maxAvg);
-  const trailSLPct  = Math.max(0, parseFloat(trailSL) || 0);
-  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', trailSLPct };
+  const cap          = parseFloat(capital);
+  const riskPctNum   = parseFloat(riskPct) || 2;
+  const targetPcts   = targets.split(',').map(v => parseFloat(v.trim()) / 100).filter(v => !isNaN(v));
+  const maxAverages  = parseInt(maxAvg);
+  const trailSLPct   = Math.max(0, parseFloat(trailSL) || 0);
+  const drawdownLevels = drawdownPcts ? drawdownPcts.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v) && v > 0) : [];
+  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', drawdownLevels, trailSLPct };
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
