@@ -1131,6 +1131,18 @@ const HTML_PAGE = `<!DOCTYPE html>
             </select>
             <div class="form-hint" id="bt-avg-mode-hint">Current: average whenever a new 20D low signal fires</div>
           </div>
+          <div style="min-width:260px;">
+            <label class="form-label">Fill Price Guard</label>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+              <input type="checkbox" id="bt-avg-fill-guard" style="width:16px;height:16px;accent-color:var(--cyan);cursor:pointer;" />
+              <label for="bt-avg-fill-guard" style="font-size:12px;color:var(--text2);cursor:pointer;line-height:1.4;">
+                Block average if fill price ≥ initial buy price
+              </label>
+            </div>
+            <div class="form-hint" style="margin-top:4px;">
+              Catches gap-up days where actual fill exceeds your first buy even if signal looked valid
+            </div>
+          </div>
           <div style="font-size:11px;font-family:var(--mono);color:var(--text3);line-height:1.6;padding-bottom:20px;">
             Each row below is the <strong style="color:var(--text2)">exit target %</strong> for that holding state.<br/>
             Lower targets after averaging reflect higher averaged cost &amp; risk.
@@ -1818,7 +1830,8 @@ function collectFilters() {
   const maxAvg = parseInt(document.getElementById('bt-max-avg').value);
   const targetInputs = document.querySelectorAll('#bt-targets-container input[data-tidx]');
   const targets = Array.from(targetInputs).map(inp => parseFloat(inp.value) || _DEF[parseInt(inp.dataset.tidx)]);
-  const avgMode = document.getElementById('bt-avg-mode').value;
+  const avgMode      = document.getElementById('bt-avg-mode').value;
+  const avgFillGuard = document.getElementById('bt-avg-fill-guard').checked;
   const tslOn   = document.getElementById('bt-tsl-mode').value === 'on';
   const trailSL = tslOn ? (parseFloat(document.getElementById('bt-tsl-pct').value) || 7) : 0;
   return {
@@ -1830,6 +1843,7 @@ function collectFilters() {
     maxAvg,
     targets,
     avgMode,
+    avgFillGuard,
     trailSL,
   };
 }
@@ -1848,7 +1862,7 @@ function runBacktest() {
   const riskPct  = riskMode === 'pct' ? riskVal : (riskVal / capital) * 100;
 
   const universe = state_bt_universe.current;
-  const fq = \`&maType=\${filters.maType}&maPeriod=\${filters.maPeriod}&w52filter=\${filters.w52filter}&volFilter=\${filters.volFilter}&rsiFilter=\${filters.rsiFilter}&maxAvg=\${filters.maxAvg}&targets=\${encodeURIComponent(filters.targets.join(','))}&riskPct=\${riskPct}&universe=\${universe}&avgMode=\${filters.avgMode}&trailSL=\${filters.trailSL}\`;
+  const fq = \`&maType=\${filters.maType}&maPeriod=\${filters.maPeriod}&w52filter=\${filters.w52filter}&volFilter=\${filters.volFilter}&rsiFilter=\${filters.rsiFilter}&maxAvg=\${filters.maxAvg}&targets=\${encodeURIComponent(filters.targets.join(','))}&riskPct=\${riskPct}&universe=\${universe}&avgMode=\${filters.avgMode}&avgFillGuard=\${filters.avgFillGuard ? '1' : '0'}&trailSL=\${filters.trailSL}\`;
 
   // Also call onMaxAvgChange immediately after load to seed the dynamic rows if not yet rendered
   if (!document.querySelector('#bt-targets-container input')) onMaxAvgChange();
@@ -3339,6 +3353,7 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
           maxAverages = 3,
           targetPcts = [0.20, 0.15, 0.10, 0.05],
           avgMode = 'native',          // 'native' | 'below_entry'
+          avgFillGuard = false,        // true = block average if fill >= entryPrice
           trailSLPct = 0 } = opts;     // 0 = TSL off, >0 = trail % after target hit
 
   const TOLERANCE     = 0.005;
@@ -3455,7 +3470,16 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
         if (today.high >= gtt.trigger) {
           // Actual fill = trigger price OR today's open if stock gapped up above trigger.
           // A gap-up means the stock never traded AT trigger — real fill is today.open.
-          const ap        = Math.max(gtt.trigger, today.open);
+          const ap = Math.max(gtt.trigger, today.open);
+
+          // Fill-price guard: if enabled, cancel this average whenever the actual
+          // fill price is at or above the initial entry price — you'd be buying at
+          // the same level or higher than your first buy, which defeats averaging down.
+          if (avgFillGuard && ap >= pos.entryPrice) {
+            gtt = null; // discard signal, wait for a genuinely lower entry
+            continue;
+          }
+
           const tradeSize = runningCapital * (riskPct / 100);
           const oldQty    = pos.totalInvested / pos.avgPrice;
           const newQty    = tradeSize / ap;
@@ -3664,14 +3688,14 @@ app.get('/api/backtest/run', async (req, res) => {
           volFilter = 'none', rsiFilter = 'none',
           maxAvg = '3', targets = '20,15,10,8,6,5,4',
           riskPct = '2', universe = 'NIFTY50', avgMode = 'native',
-          trailSL = '0' } = req.query;
+          avgFillGuard = '0', trailSL = '0' } = req.query;
 
   const cap         = parseFloat(capital);
   const riskPctNum  = parseFloat(riskPct) || 2;
   const targetPcts  = targets.split(',').map(v => parseFloat(v.trim()) / 100).filter(v => !isNaN(v));
   const maxAverages = parseInt(maxAvg);
   const trailSLPct  = Math.max(0, parseFloat(trailSL) || 0);
-  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, trailSLPct };
+  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', trailSLPct };
 
   if (!token || !clientId) {
     return res.status(400).json({ error: 'token and clientId required' });
@@ -3922,7 +3946,7 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
     volFilter = 'none', rsiFilter = 'none',
     maxAvg = '3', targets = '20,15,10,8,6,5,4',
     riskPct = '2', universe = 'NIFTY50', avgMode = 'native',
-    trailSL = '0',
+    avgFillGuard = '0', trailSL = '0',
   } = req.query;
 
   const cap         = parseFloat(capital);
@@ -3930,7 +3954,7 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
   const targetPcts  = targets.split(',').map(v => parseFloat(v.trim()) / 100).filter(v => !isNaN(v));
   const maxAverages = parseInt(maxAvg);
   const trailSLPct  = Math.max(0, parseFloat(trailSL) || 0);
-  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, trailSLPct };
+  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', trailSLPct };
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
