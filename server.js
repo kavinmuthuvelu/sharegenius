@@ -1193,6 +1193,22 @@ const HTML_PAGE = `<!DOCTYPE html>
 
         </div>
       </div>
+      <!-- ── ROW 6: Max Hold Days ──────────────────────────────────── -->
+      <div style="background:var(--bg3);border:1px solid rgba(161,87,255,0.25);border-radius:var(--radius2);padding:14px 16px;margin-bottom:12px;">
+        <div style="font-size:12px;font-family:var(--mono);color:#a157ff;font-weight:700;letter-spacing:0.5px;margin-bottom:10px;">⏱ MAX HOLD DAYS — Force-close positions after N days</div>
+        <div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;">
+          <div>
+            <label class="form-label">Max Holding Period</label>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input class="form-input" id="bt-max-hold" type="number" value="0" min="0" max="3650" step="10"
+                style="width:90px;font-size:13px;font-weight:700;color:#a157ff;text-align:right;" />
+              <span style="font-size:13px;color:var(--text2);font-family:var(--mono);">days</span>
+            </div>
+            <div class="form-hint">0 = disabled (hold indefinitely). Set e.g. 365 to close all positions after 1 year at market close price.</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Bhavcopy info box -->
       <div id="bt-bhavcopy-info" style="display:none;background:var(--green-bg);border:1px solid var(--green);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;font-size:12px;font-family:var(--mono);color:var(--green);line-height:1.7;">
         ✅ <strong>No login needed.</strong> Downloads official NSE daily Bhavcopy files directly from nsearchives.nseindia.com.<br/>
@@ -1880,6 +1896,7 @@ function collectFilters() {
   const drawdownPcts = avgMode === 'drawdown'
     ? Array.from(ddInputs).map(inp => parseFloat(inp.value) || 10)
     : [];
+  const maxHoldDays  = parseInt(document.getElementById('bt-max-hold').value) || 0;
   return {
     maType:    document.getElementById('bt-ma-type').value,
     maPeriod:  parseInt(document.getElementById('bt-ma-period').value) || 200,
@@ -1891,6 +1908,7 @@ function collectFilters() {
     avgMode,
     avgFillGuard,
     drawdownPcts,
+    maxHoldDays,
     trailSL,
   };
 }
@@ -1909,7 +1927,7 @@ function runBacktest() {
   const riskPct  = riskMode === 'pct' ? riskVal : (riskVal / capital) * 100;
 
   const universe = state_bt_universe.current;
-  const fq = \`&maType=\${filters.maType}&maPeriod=\${filters.maPeriod}&w52filter=\${filters.w52filter}&volFilter=\${filters.volFilter}&rsiFilter=\${filters.rsiFilter}&maxAvg=\${filters.maxAvg}&targets=\${encodeURIComponent(filters.targets.join(','))}&riskPct=\${riskPct}&universe=\${universe}&avgMode=\${filters.avgMode}&avgFillGuard=\${filters.avgFillGuard ? '1' : '0'}&drawdownPcts=\${encodeURIComponent(filters.drawdownPcts.join(','))}&trailSL=\${filters.trailSL}\`;
+  const fq = \`&maType=\${filters.maType}&maPeriod=\${filters.maPeriod}&w52filter=\${filters.w52filter}&volFilter=\${filters.volFilter}&rsiFilter=\${filters.rsiFilter}&maxAvg=\${filters.maxAvg}&targets=\${encodeURIComponent(filters.targets.join(','))}&riskPct=\${riskPct}&universe=\${universe}&avgMode=\${filters.avgMode}&avgFillGuard=\${filters.avgFillGuard ? '1' : '0'}&drawdownPcts=\${encodeURIComponent(filters.drawdownPcts.join(','))}&maxHoldDays=\${filters.maxHoldDays}&trailSL=\${filters.trailSL}\`;
 
   // Also call onMaxAvgChange immediately after load to seed the dynamic rows if not yet rendered
   if (!document.querySelector('#bt-targets-container input')) onMaxAvgChange();
@@ -2221,6 +2239,8 @@ function renderBtTrades() {
           ? '<span class="badge badge-hit">\ud83c\udfaf TARGET</span>'
           : isTSL
           ? '<span class="badge badge-alert">\ud83d\uded1 TSL</span>'
+          : t.exit_reason === 'TIMEOUT'
+          ? '<span class="badge" style="background:rgba(255,165,0,0.15);color:#ffa500;border:1px solid rgba(255,165,0,0.35);">\u23f1 TIMEOUT</span>'
           : isOpen
           ? '<span class="badge badge-open">\ud83d\udcc2 OPEN</span>'
           : '<span class="badge badge-closed">EXIT</span>'}
@@ -2297,9 +2317,11 @@ function _doExcelExport(trades) {
     ? Math.min(...closed.filter(t => t.capital_after != null).map(t => t.capital_after))
     : startCap;
 
-  const tslExits = closed.filter(t => t.exit_reason === 'TSL');
+  const tslExits     = closed.filter(t => t.exit_reason === 'TSL');
+  const timeoutExits = closed.filter(t => t.exit_reason === 'TIMEOUT');
   const tslPctSetting = document.getElementById('bt-tsl-mode') && document.getElementById('bt-tsl-mode').value === 'on'
     ? (parseFloat(document.getElementById('bt-tsl-pct').value) || 7) : 0;
+  const maxHoldSetting = parseInt(document.getElementById('bt-max-hold').value) || 0;
   const sumRows = [
     { Metric: 'Starting Capital \u20b9', Value: startCap },
     { Metric: 'Final Value \u20b9',      Value: +(startCap + totalPnl).toFixed(2) },
@@ -2308,6 +2330,8 @@ function _doExcelExport(trades) {
     { Metric: 'Total Trades',           Value: allT.length },
     { Metric: 'Closed (Target)',        Value: closed.filter(t => t.exit_reason === 'TARGET').length },
     { Metric: 'Closed (TSL)',           Value: tslExits.length },
+    { Metric: 'Closed (Timeout)',        Value: timeoutExits.length },
+    { Metric: 'Max Hold Days Setting',   Value: maxHoldSetting || 'Off' },
     { Metric: 'Wins',                   Value: wins.length },
     { Metric: 'Win Rate %',             Value: closed.length ? +((wins.length / closed.length) * 100).toFixed(2) : 0 },
     { Metric: 'Open (MTM)',             Value: allT.filter(t => t.exit_reason === 'OPEN').length },
@@ -3402,6 +3426,7 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
           avgMode = 'native',          // 'native' | 'drawdown' | 'below_entry'
           avgFillGuard = false,        // true = block average if fill >= entryPrice
           drawdownLevels = [],         // [10,20,30] % drops from entryPrice for drawdown mode
+          maxHold = 0,                 // 0 = disabled; >0 = force-close at today.close after N days
           trailSLPct = 0 } = opts;     // 0 = TSL off, >0 = trail % after target hit
 
   const TOLERANCE     = 0.005;
@@ -3436,6 +3461,25 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
       const tp  = targetPcts[Math.min(pos.avgCount, targetPcts.length - 1)];
       const tgt = pos.avgPrice * (1 + tp);
       const holdDays = Math.round((new Date(d) - new Date(pos.entryDate)) / 86400000);
+
+      // ── Max Hold Days: force-close at today's close if holding too long ───
+      if (maxHold > 0 && holdDays >= maxHold) {
+        const exitPx = today.close;
+        const qty    = pos.totalInvested / pos.avgPrice;
+        const pnl    = +((exitPx - pos.avgPrice) * qty).toFixed(2);
+        runningCapital += pnl;
+        trades.push({
+          symbol, entry_date: pos.entryDate, entry_price: +pos.entryPrice.toFixed(2),
+          avg_cost: +pos.avgPrice.toFixed(2),
+          exit_date: d, exit_price: +exitPx.toFixed(2),
+          invested: +pos.totalInvested.toFixed(2), pnl,
+          avg_count: pos.avgCount, exit_reason: 'TIMEOUT',
+          hold_days: holdDays, target_pct: +(targetPcts[Math.min(pos.avgCount, targetPcts.length - 1)] * 100).toFixed(1),
+          capital_after: +runningCapital.toFixed(2),
+          ...spreadAvgs(pos.avgs),
+        });
+        pos = null; gtt = null; continue;
+      }
 
       // ── TSL path: TSL is ON ──────────────────────────────────────────────
       if (needTSL) {
@@ -3733,7 +3777,7 @@ app.get('/api/backtest/run', async (req, res) => {
           volFilter = 'none', rsiFilter = 'none',
           maxAvg = '3', targets = '20,15,10,8,6,5,4',
           riskPct = '2', universe = 'NIFTY50', avgMode = 'native',
-          avgFillGuard = '0', drawdownPcts = '', trailSL = '0' } = req.query;
+          avgFillGuard = '0', drawdownPcts = '', maxHoldDays = '0', trailSL = '0' } = req.query;
 
   const cap          = parseFloat(capital);
   const riskPctNum   = parseFloat(riskPct) || 2;
@@ -3741,7 +3785,8 @@ app.get('/api/backtest/run', async (req, res) => {
   const maxAverages  = parseInt(maxAvg);
   const trailSLPct   = Math.max(0, parseFloat(trailSL) || 0);
   const drawdownLevels = drawdownPcts ? drawdownPcts.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v) && v > 0) : [];
-  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', drawdownLevels, trailSLPct };
+  const maxHold      = Math.max(0, parseInt(maxHoldDays) || 0);
+  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', drawdownLevels, maxHold, trailSLPct };
 
   if (!token || !clientId) {
     return res.status(400).json({ error: 'token and clientId required' });
@@ -3992,7 +4037,7 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
     volFilter = 'none', rsiFilter = 'none',
     maxAvg = '3', targets = '20,15,10,8,6,5,4',
     riskPct = '2', universe = 'NIFTY50', avgMode = 'native',
-    avgFillGuard = '0', drawdownPcts = '', trailSL = '0',
+    avgFillGuard = '0', drawdownPcts = '', maxHoldDays = '0', trailSL = '0',
   } = req.query;
 
   const cap          = parseFloat(capital);
@@ -4001,7 +4046,8 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
   const maxAverages  = parseInt(maxAvg);
   const trailSLPct   = Math.max(0, parseFloat(trailSL) || 0);
   const drawdownLevels = drawdownPcts ? drawdownPcts.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v) && v > 0) : [];
-  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', drawdownLevels, trailSLPct };
+  const maxHold      = Math.max(0, parseInt(maxHoldDays) || 0);
+  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', drawdownLevels, maxHold, trailSLPct };
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
