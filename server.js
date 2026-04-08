@@ -1053,6 +1053,16 @@ const HTML_PAGE = `<!DOCTYPE html>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
 
           <div>
+            <label class="form-label">Lookback Period (days)</label>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input class="form-input" id="bt-lookback" type="number" value="20" min="5" max="100" step="1"
+                style="font-size:13px;font-weight:700;color:var(--cyan);width:80px;text-align:right;" />
+              <span style="font-size:13px;color:var(--text2);font-family:var(--mono);">days</span>
+            </div>
+            <div class="form-hint">Rolling window for High/Low signal. Default 20 = the original Sharegenius system.</div>
+          </div>
+
+          <div>
             <label class="form-label">Price above N-Day Moving Avg</label>
             <div style="display:flex;gap:6px;align-items:center;">
               <select class="form-input" id="bt-ma-type" style="font-size:12px;padding:6px 8px;width:90px;">
@@ -1897,6 +1907,7 @@ function collectFilters() {
     ? Array.from(ddInputs).map(inp => parseFloat(inp.value) || 10)
     : [];
   const maxHoldDays  = parseInt(document.getElementById('bt-max-hold').value) || 0;
+  const lookback     = parseInt(document.getElementById('bt-lookback').value) || 20;
   return {
     maType:    document.getElementById('bt-ma-type').value,
     maPeriod:  parseInt(document.getElementById('bt-ma-period').value) || 200,
@@ -1909,6 +1920,7 @@ function collectFilters() {
     avgFillGuard,
     drawdownPcts,
     maxHoldDays,
+    lookback,
     trailSL,
   };
 }
@@ -1927,7 +1939,7 @@ function runBacktest() {
   const riskPct  = riskMode === 'pct' ? riskVal : (riskVal / capital) * 100;
 
   const universe = state_bt_universe.current;
-  const fq = \`&maType=\${filters.maType}&maPeriod=\${filters.maPeriod}&w52filter=\${filters.w52filter}&volFilter=\${filters.volFilter}&rsiFilter=\${filters.rsiFilter}&maxAvg=\${filters.maxAvg}&targets=\${encodeURIComponent(filters.targets.join(','))}&riskPct=\${riskPct}&universe=\${universe}&avgMode=\${filters.avgMode}&avgFillGuard=\${filters.avgFillGuard ? '1' : '0'}&drawdownPcts=\${encodeURIComponent(filters.drawdownPcts.join(','))}&maxHoldDays=\${filters.maxHoldDays}&trailSL=\${filters.trailSL}\`;
+  const fq = \`&maType=\${filters.maType}&maPeriod=\${filters.maPeriod}&w52filter=\${filters.w52filter}&volFilter=\${filters.volFilter}&rsiFilter=\${filters.rsiFilter}&maxAvg=\${filters.maxAvg}&targets=\${encodeURIComponent(filters.targets.join(','))}&riskPct=\${riskPct}&universe=\${universe}&avgMode=\${filters.avgMode}&avgFillGuard=\${filters.avgFillGuard ? '1' : '0'}&drawdownPcts=\${encodeURIComponent(filters.drawdownPcts.join(','))}&maxHoldDays=\${filters.maxHoldDays}&lookback=\${filters.lookback}&trailSL=\${filters.trailSL}\`;
 
   // Also call onMaxAvgChange immediately after load to seed the dynamic rows if not yet rendered
   if (!document.querySelector('#bt-targets-container input')) onMaxAvgChange();
@@ -3427,6 +3439,7 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
           avgFillGuard = false,        // true = block average if fill >= entryPrice
           drawdownLevels = [],         // [10,20,30] % drops from entryPrice for drawdown mode
           maxHold = 0,                 // 0 = disabled; >0 = force-close at today.close after N days
+          lookbackN = 20,              // rolling window for High/Low signal (default 20)
           trailSLPct = 0 } = opts;     // 0 = TSL off, >0 = trail % after target hit
 
   const TOLERANCE     = 0.005;
@@ -3442,11 +3455,11 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
   let pos = null, gtt = null;
 
   // Warmup: need enough rows for longest indicator
-  const warmup = Math.max(20, needMA ? maPeriod + 5 : 0, need52W ? 252 : 0, needRSI ? 20 : 0);
+  const warmup = Math.max(lookbackN, needMA ? maPeriod + 5 : 0, need52W ? 252 : 0, needRSI ? 20 : 0);
 
   for (let i = warmup; i < rows.length; i++) {
     const today  = rows[i];
-    const w20    = rows.slice(i - 20, i);
+    const w20    = rows.slice(i - lookbackN, i);
     const high20 = Math.max(...w20.map(r => r.high));
     const low20  = Math.min(...w20.map(r => r.low));
     const d      = today.date;
@@ -3652,7 +3665,7 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
           if (w52filter === 'below' && today.close > low52)         { gtt = null; blocked = true; }
         }
         if (!blocked && needVol && today.volume) {
-          const avgVol = calcAvgVolume(rows, 20, i);
+          const avgVol = calcAvgVolume(rows, lookbackN, i);
           if (avgVol && today.volume < avgVol * volMult) { gtt = null; blocked = true; }
         }
         if (!blocked && needRSI) {
@@ -3701,7 +3714,7 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
 
     // Volume filter
     if (needVol && today.volume) {
-      const avgVol = calcAvgVolume(rows, 20, i);
+      const avgVol = calcAvgVolume(rows, lookbackN, i);
       if (avgVol && today.volume < avgVol * volMult) { gtt = null; continue; }
     }
 
@@ -3777,7 +3790,7 @@ app.get('/api/backtest/run', async (req, res) => {
           volFilter = 'none', rsiFilter = 'none',
           maxAvg = '3', targets = '20,15,10,8,6,5,4',
           riskPct = '2', universe = 'NIFTY50', avgMode = 'native',
-          avgFillGuard = '0', drawdownPcts = '', maxHoldDays = '0', trailSL = '0' } = req.query;
+          avgFillGuard = '0', drawdownPcts = '', maxHoldDays = '0', lookback = '20', trailSL = '0' } = req.query;
 
   const cap          = parseFloat(capital);
   const riskPctNum   = parseFloat(riskPct) || 2;
@@ -3786,7 +3799,8 @@ app.get('/api/backtest/run', async (req, res) => {
   const trailSLPct   = Math.max(0, parseFloat(trailSL) || 0);
   const drawdownLevels = drawdownPcts ? drawdownPcts.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v) && v > 0) : [];
   const maxHold      = Math.max(0, parseInt(maxHoldDays) || 0);
-  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', drawdownLevels, maxHold, trailSLPct };
+  const lookbackN    = Math.max(5, Math.min(100, parseInt(lookback) || 20));
+  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', drawdownLevels, maxHold, lookbackN, trailSLPct };
 
   if (!token || !clientId) {
     return res.status(400).json({ error: 'token and clientId required' });
@@ -4037,7 +4051,7 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
     volFilter = 'none', rsiFilter = 'none',
     maxAvg = '3', targets = '20,15,10,8,6,5,4',
     riskPct = '2', universe = 'NIFTY50', avgMode = 'native',
-    avgFillGuard = '0', drawdownPcts = '', maxHoldDays = '0', trailSL = '0',
+    avgFillGuard = '0', drawdownPcts = '', maxHoldDays = '0', lookback = '20', trailSL = '0',
   } = req.query;
 
   const cap          = parseFloat(capital);
@@ -4047,7 +4061,8 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
   const trailSLPct   = Math.max(0, parseFloat(trailSL) || 0);
   const drawdownLevels = drawdownPcts ? drawdownPcts.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v) && v > 0) : [];
   const maxHold      = Math.max(0, parseInt(maxHoldDays) || 0);
-  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', drawdownLevels, maxHold, trailSLPct };
+  const lookbackN    = Math.max(5, Math.min(100, parseInt(lookback) || 20));
+  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', drawdownLevels, maxHold, lookbackN, trailSLPct };
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
