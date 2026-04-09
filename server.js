@@ -2469,32 +2469,103 @@ function _doExcelExport(trades) {
 
   const tslExits     = closed.filter(t => t.exit_reason === 'TSL');
   const timeoutExits = closed.filter(t => t.exit_reason === 'TIMEOUT');
-  const tslPctSetting = document.getElementById('bt-tsl-mode') && document.getElementById('bt-tsl-mode').value === 'on'
-    ? (parseFloat(document.getElementById('bt-tsl-pct').value) || 7) : 0;
-  const maxHoldSetting = parseInt(document.getElementById('bt-max-hold').value) || 0;
+
+  // ── Read every input from the UI ──────────────────────────────────────────
+  const g = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+  const gb = id => { const el = document.getElementById(id); return el ? el.checked : false; };
+
+  const riskMode    = g('bt-risk-mode');
+  const riskVal     = g('bt-risk-value');
+  const tslMode     = g('bt-tsl-mode');
+  const tslMethod   = tslMode === 'on' ? g('bt-tsl-method') : 'off';
+  const avgMode     = g('bt-avg-mode');
+
+  // Dynamic target % per averaging level
+  const targetInputs = document.querySelectorAll('#bt-targets-container input[data-tidx]');
+  const targetVals   = Array.from(targetInputs).map(inp => inp.value + '%').join(' / ') || '—';
+
+  // Dynamic drawdown levels (only in drawdown avg mode)
+  const ddInputs  = document.querySelectorAll('#bt-drawdown-container input[data-ddidx]');
+  const ddVals    = Array.from(ddInputs).map(inp => inp.value + '%').join(' / ') || '—';
+
+  const maxHoldSetting = parseInt(g('bt-max-hold')) || 0;
+  const tslPctSetting  = tslMode === 'on' && tslMethod === 'fixed'
+    ? (parseFloat(g('bt-tsl-pct')) || 7) : 0;
+
   const sumRows = [
-    { Metric: 'Starting Capital \u20b9', Value: startCap },
-    { Metric: 'Final Value \u20b9',      Value: +(startCap + totalPnl).toFixed(2) },
-    { Metric: 'Total P&L \u20b9',        Value: +totalPnl.toFixed(2) },
-    { Metric: 'Return %',               Value: +((totalPnl / startCap) * 100).toFixed(2) },
-    { Metric: 'Total Trades',           Value: allT.length },
-    { Metric: 'Closed (Target)',        Value: closed.filter(t => t.exit_reason === 'TARGET').length },
-    { Metric: 'Closed (TSL)',           Value: tslExits.length },
-    { Metric: 'Closed (Timeout)',        Value: timeoutExits.length },
-    { Metric: 'Max Hold Days Setting',   Value: maxHoldSetting || 'Off' },
-    { Metric: 'Wins',                   Value: wins.length },
-    { Metric: 'Win Rate %',             Value: closed.length ? +((wins.length / closed.length) * 100).toFixed(2) : 0 },
-    { Metric: 'Open (MTM)',             Value: allT.filter(t => t.exit_reason === 'OPEN').length },
-    { Metric: 'Lowest Capital \u20b9',   Value: +minCap.toFixed(2) },
-    { Metric: 'Avg Hold Days — Closed',  Value: allSummary.avg_hold_closed || '' },
-    { Metric: 'Avg Hold Days — Open',    Value: allSummary.avg_hold_open   || '' },
-    { Metric: 'Net P&L — Open Trades ₹', Value: allSummary.open_pnl != null ? allSummary.open_pnl : '' },
-    { Metric: 'TSL % Setting',           Value: tslPctSetting || 'Off' },
-    { Metric: 'Universe',                Value: state_bt_universe ? state_bt_universe.current : 'NIFTY50' },
-    { Metric: 'Exported',                Value: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) },
+    // ── RESULTS ──────────────────────────────────────────────────────────────
+    { Metric: '── RESULTS ──',              Value: '' },
+    { Metric: 'Starting Capital \u20b9',    Value: startCap },
+    { Metric: 'Final Value \u20b9',         Value: +(startCap + totalPnl).toFixed(2) },
+    { Metric: 'Total P&L \u20b9',           Value: +totalPnl.toFixed(2) },
+    { Metric: 'Return %',                  Value: +((totalPnl / startCap) * 100).toFixed(2) },
+    { Metric: 'CAGR %',                    Value: allSummary.cagr != null ? allSummary.cagr : '' },
+    { Metric: 'Total Trades',              Value: allT.length },
+    { Metric: 'Closed (Target)',           Value: closed.filter(t => t.exit_reason === 'TARGET').length },
+    { Metric: 'Closed (TSL)',              Value: tslExits.length },
+    { Metric: 'Closed (Timeout)',          Value: timeoutExits.length },
+    { Metric: 'Open (MTM)',                Value: allT.filter(t => t.exit_reason === 'OPEN').length },
+    { Metric: 'Wins',                      Value: wins.length },
+    { Metric: 'Win Rate %',                Value: closed.length ? +((wins.length / closed.length) * 100).toFixed(2) : 0 },
+    { Metric: 'Avg Win \u20b9',            Value: allSummary.avg_win != null ? allSummary.avg_win : '' },
+    { Metric: 'Avg Loss \u20b9',           Value: allSummary.avg_loss != null ? allSummary.avg_loss : '' },
+    { Metric: 'Lowest Capital \u20b9',     Value: +minCap.toFixed(2) },
+    { Metric: 'Avg Hold Days — Closed',    Value: allSummary.avg_hold_closed || '' },
+    { Metric: 'Avg Hold Days — Open',      Value: allSummary.avg_hold_open   || '' },
+    { Metric: 'Net P&L — Open Trades \u20b9', Value: allSummary.open_pnl != null ? allSummary.open_pnl : '' },
+    { Metric: '',                          Value: '' },
+    // ── RUN SETTINGS ─────────────────────────────────────────────────────────
+    { Metric: '── RUN SETTINGS ──',        Value: '' },
+    { Metric: 'Data Source',               Value: document.getElementById('src-dhan') && document.getElementById('src-dhan').classList.contains('active') ? 'Dhan API' : 'NSE Bhavcopy' },
+    { Metric: 'Universe',                  Value: state_bt_universe ? state_bt_universe.current : 'NIFTY50' },
+    { Metric: 'From Date',                 Value: g('bt-from') },
+    { Metric: 'To Date',                   Value: g('bt-to') },
+    { Metric: '',                          Value: '' },
+    // ── CAPITAL & RISK ───────────────────────────────────────────────────────
+    { Metric: '── CAPITAL & RISK ──',      Value: '' },
+    { Metric: 'Starting Capital \u20b9',   Value: startCap },
+    { Metric: 'Risk Mode',                 Value: riskMode === 'pct' ? '% of capital (compounding)' : 'Fixed \u20b9 per trade' },
+    { Metric: 'Risk Value',                Value: riskMode === 'pct' ? riskVal + '%' : '\u20b9' + riskVal },
+    { Metric: '',                          Value: '' },
+    // ── ENTRY FILTERS ────────────────────────────────────────────────────────
+    { Metric: '── ENTRY FILTERS ──',       Value: '' },
+    { Metric: 'Lookback Period (days)',     Value: g('bt-lookback') || 20 },
+    { Metric: 'Moving Average Filter',     Value: g('bt-ma-type') === 'none' ? 'Off' : g('bt-ma-type').toUpperCase() + '(' + g('bt-ma-period') + ')' },
+    { Metric: '52-Week Low Filter',        Value: g('bt-52w-filter') === 'none' ? 'Off' : g('bt-52w-filter') },
+    { Metric: 'Volume Filter',             Value: g('bt-vol-filter') === 'none' ? 'Off' : g('bt-vol-filter') + 'x avg volume' },
+    { Metric: 'RSI Filter',                Value: g('bt-rsi-filter') === 'none' ? 'Off' : g('bt-rsi-filter') },
+    { Metric: '',                          Value: '' },
+    // ── AVERAGING CONFIG ─────────────────────────────────────────────────────
+    { Metric: '── AVERAGING CONFIG ──',    Value: '' },
+    { Metric: 'Max Averages',              Value: g('bt-max-avg') },
+    { Metric: 'Averaging Trigger',         Value: avgMode === 'native' ? 'Any new 20D low signal' : avgMode === 'drawdown' ? 'Fixed % drawdown from entry' : '20D high below entry price' },
+    { Metric: 'Drawdown Levels',           Value: avgMode === 'drawdown' ? ddVals : 'N/A' },
+    { Metric: 'Target % per Level',        Value: targetVals },
+    { Metric: 'Fill Price Guard',          Value: gb('bt-avg-fill-guard') ? 'On' : 'Off' },
+    { Metric: 'Extra Avgs after 1yr',      Value: g('bt-yr1-avg') },
+    { Metric: 'Extra Avgs after 2yr',      Value: g('bt-yr2-avg') },
+    { Metric: 'Extra Avgs after 3yr',      Value: g('bt-yr3-avg') },
+    { Metric: '',                          Value: '' },
+    // ── TRAILING STOP LOSS ───────────────────────────────────────────────────
+    { Metric: '── TRAILING STOP LOSS ──',  Value: '' },
+    { Metric: 'TSL Mode',                  Value: tslMode === 'on' ? 'On' : 'Off' },
+    { Metric: 'TSL Method',                Value: tslMode !== 'on' ? 'N/A' : tslMethod === 'fixed' ? 'Fixed %' : tslMethod === 'atr' ? 'Dynamic ATR' : 'Max Drawdown since listing' },
+    { Metric: 'TSL Fixed %',               Value: tslMode === 'on' && tslMethod === 'fixed' ? g('bt-tsl-pct') + '%' : 'N/A' },
+    { Metric: 'TSL ATR Period (days)',      Value: tslMode === 'on' && tslMethod === 'atr' ? g('bt-tsl-atr-period') : 'N/A' },
+    { Metric: 'TSL ATR Multiplier',        Value: tslMode === 'on' && tslMethod === 'atr' ? g('bt-tsl-atr-mult') + 'x' : 'N/A' },
+    { Metric: 'TSL ATR Min %',             Value: tslMode === 'on' && tslMethod === 'atr' ? g('bt-tsl-atr-min') + '%' : 'N/A' },
+    { Metric: 'TSL ATR Max %',             Value: tslMode === 'on' && tslMethod === 'atr' ? g('bt-tsl-atr-max') + '%' : 'N/A' },
+    { Metric: 'TSL Max DD Min %',          Value: tslMode === 'on' && tslMethod === 'maxdd' ? g('bt-tsl-dd-min') + '%' : 'N/A' },
+    { Metric: 'TSL Max DD Max %',          Value: tslMode === 'on' && tslMethod === 'maxdd' ? g('bt-tsl-dd-max') + '%' : 'N/A' },
+    { Metric: '',                          Value: '' },
+    // ── OTHER ────────────────────────────────────────────────────────────────
+    { Metric: '── OTHER ──',               Value: '' },
+    { Metric: 'Max Hold Days',             Value: maxHoldSetting || 'Off (hold indefinitely)' },
+    { Metric: '',                          Value: '' },
+    { Metric: 'Exported',                  Value: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) },
   ];
   const wsSummary = XLSX.utils.json_to_sheet(sumRows);
-  wsSummary['!cols'] = [{wch:24},{wch:22}];
+  wsSummary['!cols'] = [{wch:34},{wch:30}];
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Trade Log');
