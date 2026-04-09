@@ -1284,6 +1284,14 @@ const HTML_PAGE = `<!DOCTYPE html>
             <div id="bt-tsl-maxdd-wrap" style="display:none;">
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                 <div style="display:flex;flex-direction:column;gap:2px;">
+                  <span style="font-size:10px;color:var(--text3);font-family:var(--mono);">% of Max DD to use</span>
+                  <div style="display:flex;gap:4px;align-items:center;">
+                    <input class="form-input" id="bt-tsl-dd-pct" type="number" value="100" min="10" max="100" step="5"
+                      style="width:60px;font-size:12px;font-weight:700;color:var(--red);text-align:right;" />
+                    <span style="font-size:11px;color:var(--text2);font-family:var(--mono);">%</span>
+                  </div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:2px;">
                   <span style="font-size:10px;color:var(--text3);font-family:var(--mono);">Min TSL %</span>
                   <div style="display:flex;gap:4px;align-items:center;">
                     <input class="form-input" id="bt-tsl-dd-min" type="number" value="5" min="1" max="30" step="0.5"
@@ -1301,7 +1309,8 @@ const HTML_PAGE = `<!DOCTYPE html>
                 </div>
               </div>
               <div class="form-hint" style="margin-top:6px;">
-                TSL% = stock's max peak-to-trough drawdown across ALL data before your entry, clamped to [min, max].
+                TSL% = Max DD × (% of Max DD / 100), clamped to [min, max].<br/>
+                e.g. stock Max DD = 60%, use 50% → TSL = 30%. Use 100% to trail the full historical drawdown.
               </div>
             </div>
           </div>
@@ -2028,6 +2037,7 @@ function collectFilters() {
     max    : parseFloat(document.getElementById('bt-tsl-atr-max').value)   || 20,
   } : null;
   const tslMaxDD = tslOn && tslMethod === 'maxdd' ? {
+    pct : parseFloat(document.getElementById('bt-tsl-dd-pct').value) || 100,
     min : parseFloat(document.getElementById('bt-tsl-dd-min').value) || 5,
     max : parseFloat(document.getElementById('bt-tsl-dd-max').value) || 40,
   } : null;
@@ -2077,7 +2087,7 @@ function runBacktest() {
   const riskPct  = riskMode === 'pct' ? riskVal : (riskVal / capital) * 100;
 
   const universe = state_bt_universe.current;
-  const fq = \`&maType=\${filters.maType}&maPeriod=\${filters.maPeriod}&w52filter=\${filters.w52filter}&volFilter=\${filters.volFilter}&rsiFilter=\${filters.rsiFilter}&maxAvg=\${filters.maxAvg}&targets=\${encodeURIComponent(filters.targets.join(','))}&riskPct=\${riskPct}&universe=\${universe}&avgMode=\${filters.avgMode}&avgFillGuard=\${filters.avgFillGuard ? '1' : '0'}&drawdownPcts=\${encodeURIComponent(filters.drawdownPcts.join(','))}&maxHoldDays=\${filters.maxHoldDays}&timeAvgs=\${filters.timeAvgs.join(',')}&lookback=\${filters.lookback}&trailSL=\${filters.trailSL}&tslAtrPeriod=\${filters.tslAtr ? filters.tslAtr.period : 0}&tslAtrMult=\${filters.tslAtr ? filters.tslAtr.mult : 0}&tslAtrMin=\${filters.tslAtr ? filters.tslAtr.min : 0}&tslAtrMax=\${filters.tslAtr ? filters.tslAtr.max : 0}&tslDDMin=\${filters.tslMaxDD ? filters.tslMaxDD.min : 0}&tslDDMax=\${filters.tslMaxDD ? filters.tslMaxDD.max : 0}\`;
+  const fq = \`&maType=\${filters.maType}&maPeriod=\${filters.maPeriod}&w52filter=\${filters.w52filter}&volFilter=\${filters.volFilter}&rsiFilter=\${filters.rsiFilter}&maxAvg=\${filters.maxAvg}&targets=\${encodeURIComponent(filters.targets.join(','))}&riskPct=\${riskPct}&universe=\${universe}&avgMode=\${filters.avgMode}&avgFillGuard=\${filters.avgFillGuard ? '1' : '0'}&drawdownPcts=\${encodeURIComponent(filters.drawdownPcts.join(','))}&maxHoldDays=\${filters.maxHoldDays}&timeAvgs=\${filters.timeAvgs.join(',')}&lookback=\${filters.lookback}&trailSL=\${filters.trailSL}&tslAtrPeriod=\${filters.tslAtr ? filters.tslAtr.period : 0}&tslAtrMult=\${filters.tslAtr ? filters.tslAtr.mult : 0}&tslAtrMin=\${filters.tslAtr ? filters.tslAtr.min : 0}&tslAtrMax=\${filters.tslAtr ? filters.tslAtr.max : 0}&tslDDMin=\${filters.tslMaxDD ? filters.tslMaxDD.min : 0}&tslDDMax=\${filters.tslMaxDD ? filters.tslMaxDD.max : 0}&tslDDPct=\${filters.tslMaxDD ? filters.tslMaxDD.pct : 100}\`;
 
   // Also call onMaxAvgChange immediately after load to seed the dynamic rows if not yet rendered
   if (!document.querySelector('#bt-targets-container input')) onMaxAvgChange();
@@ -2555,6 +2565,7 @@ function _doExcelExport(trades) {
     { Metric: 'TSL ATR Multiplier',        Value: tslMode === 'on' && tslMethod === 'atr' ? g('bt-tsl-atr-mult') + 'x' : 'N/A' },
     { Metric: 'TSL ATR Min %',             Value: tslMode === 'on' && tslMethod === 'atr' ? g('bt-tsl-atr-min') + '%' : 'N/A' },
     { Metric: 'TSL ATR Max %',             Value: tslMode === 'on' && tslMethod === 'atr' ? g('bt-tsl-atr-max') + '%' : 'N/A' },
+    { Metric: 'TSL Max DD % to use',      Value: tslMode === 'on' && tslMethod === 'maxdd' ? g('bt-tsl-dd-pct') + '%' : 'N/A' },
     { Metric: 'TSL Max DD Min %',          Value: tslMode === 'on' && tslMethod === 'maxdd' ? g('bt-tsl-dd-min') + '%' : 'N/A' },
     { Metric: 'TSL Max DD Max %',          Value: tslMode === 'on' && tslMethod === 'maxdd' ? g('bt-tsl-dd-max') + '%' : 'N/A' },
     { Metric: '',                          Value: '' },
@@ -3931,9 +3942,11 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
             }
           } else if (tslMaxDDCfg) {
             // Max drawdown since listing — full history before entry
+            // Apply user-defined % of that drawdown (e.g. 50% of max DD)
             const dd = calcMaxDrawdownPct(rows, i);
             if (dd !== null) {
-              posTslPct = Math.min(tslMaxDDCfg.max, Math.max(tslMaxDDCfg.min, dd));
+              const scaled = dd * ((tslMaxDDCfg.pct || 100) / 100);
+              posTslPct = Math.min(tslMaxDDCfg.max, Math.max(tslMaxDDCfg.min, +scaled.toFixed(2)));
             } else {
               posTslPct = tslMaxDDCfg.min;  // fallback if not enough history
             }
@@ -4062,7 +4075,7 @@ app.get('/api/backtest/run', async (req, res) => {
   const atrPeriod    = parseInt(req.query.tslAtrPeriod) || 0;
   const tslAtrCfg    = atrPeriod > 0 ? { period: atrPeriod, mult: parseFloat(req.query.tslAtrMult)||1.5, min: parseFloat(req.query.tslAtrMin)||3, max: parseFloat(req.query.tslAtrMax)||20 } : null;
   const ddMin        = parseFloat(req.query.tslDDMin) || 0;
-  const tslMaxDDCfg  = ddMin > 0 ? { min: ddMin, max: parseFloat(req.query.tslDDMax)||40 } : null;
+  const tslMaxDDCfg  = ddMin > 0 ? { pct: Math.min(100, Math.max(1, parseFloat(req.query.tslDDPct)||100)), min: ddMin, max: parseFloat(req.query.tslDDMax)||40 } : null;
   const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', drawdownLevels, maxHold, timeAvgs: timeAvgsList, lookbackN, trailSLPct, tslAtrCfg, tslMaxDDCfg };
 
   if (!token || !clientId) {
@@ -4329,7 +4342,7 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
   const atrPeriod    = parseInt(req.query.tslAtrPeriod) || 0;
   const tslAtrCfg    = atrPeriod > 0 ? { period: atrPeriod, mult: parseFloat(req.query.tslAtrMult)||1.5, min: parseFloat(req.query.tslAtrMin)||3, max: parseFloat(req.query.tslAtrMax)||20 } : null;
   const ddMin        = parseFloat(req.query.tslDDMin) || 0;
-  const tslMaxDDCfg  = ddMin > 0 ? { min: ddMin, max: parseFloat(req.query.tslDDMax)||40 } : null;
+  const tslMaxDDCfg  = ddMin > 0 ? { pct: Math.min(100, Math.max(1, parseFloat(req.query.tslDDPct)||100)), min: ddMin, max: parseFloat(req.query.tslDDMax)||40 } : null;
   const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', drawdownLevels, maxHold, timeAvgs: timeAvgsList, lookbackN, trailSLPct, tslAtrCfg, tslMaxDDCfg };
 
   res.setHeader('Content-Type', 'text/event-stream');
