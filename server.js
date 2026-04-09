@@ -1166,6 +1166,44 @@ const HTML_PAGE = `<!DOCTYPE html>
           </div>
         </div>
         <div id="bt-targets-container" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:10px;"></div>
+
+        <!-- Time-based extra averages -->
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
+          <div style="font-size:11px;font-family:var(--mono);color:var(--cyan);font-weight:700;letter-spacing:0.5px;margin-bottom:10px;">⏳ EXTRA AVERAGES FOR LONG HOLDS — Unlocked by holding period</div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;">
+            <div>
+              <label class="form-label" style="white-space:nowrap;">After 1 Year (&gt;365d)</label>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <span style="font-size:12px;color:var(--text3);font-family:var(--mono);">+</span>
+                <input class="form-input" id="bt-yr1-avg" type="number" value="1" min="0" max="5" step="1"
+                  style="width:54px;font-size:13px;font-weight:700;color:var(--cyan);text-align:right;" />
+                <span style="font-size:12px;color:var(--text2);font-family:var(--mono);">avg</span>
+              </div>
+            </div>
+            <div>
+              <label class="form-label" style="white-space:nowrap;">After 2 Years (&gt;730d)</label>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <span style="font-size:12px;color:var(--text3);font-family:var(--mono);">+</span>
+                <input class="form-input" id="bt-yr2-avg" type="number" value="2" min="0" max="5" step="1"
+                  style="width:54px;font-size:13px;font-weight:700;color:var(--cyan);text-align:right;" />
+                <span style="font-size:12px;color:var(--text2);font-family:var(--mono);">avg</span>
+              </div>
+            </div>
+            <div>
+              <label class="form-label" style="white-space:nowrap;">After 3 Years (&gt;1095d)</label>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <span style="font-size:12px;color:var(--text3);font-family:var(--mono);">+</span>
+                <input class="form-input" id="bt-yr3-avg" type="number" value="3" min="0" max="5" step="1"
+                  style="width:54px;font-size:13px;font-weight:700;color:var(--cyan);text-align:right;" />
+                <span style="font-size:12px;color:var(--text2);font-family:var(--mono);">avg</span>
+              </div>
+            </div>
+            <div style="font-size:11px;font-family:var(--mono);color:var(--text3);line-height:1.6;padding-bottom:2px;">
+              Set 0 to disable. These are <em>cumulative</em> extras on top of Max Averages above.<br/>
+              e.g. Max=3, After 2yr=+2 → up to 5 total averages after 730 days.
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ── ROW 5: Trailing Stop Loss ──────────────────────────────── -->
@@ -1183,22 +1221,69 @@ const HTML_PAGE = `<!DOCTYPE html>
           </div>
 
           <div id="bt-tsl-pct-wrap" style="display:none;">
-            <label class="form-label">TSL % (trail from peak)</label>
-            <div style="display:flex;gap:6px;align-items:center;">
-              <input class="form-input" id="bt-tsl-pct" type="number" value="7" min="1" max="50" step="0.5"
-                oninput="onTslPctChange()"
-                style="font-size:13px;font-weight:700;color:var(--red);flex:1;text-align:right;" />
-              <span style="font-size:13px;color:var(--text2);font-family:var(--mono);">%</span>
+            <label class="form-label">TSL Method</label>
+            <select class="form-input" id="bt-tsl-method" onchange="onTslMethodChange()" style="font-size:12px;padding:6px 8px;margin-bottom:8px;">
+              <option value="fixed">Fixed % — same trail for all stocks</option>
+              <option value="atr">Dynamic — ATR-based (stock's own volatility)</option>
+            </select>
+
+            <!-- Fixed % sub-row -->
+            <div id="bt-tsl-fixed-wrap">
+              <div style="display:flex;gap:6px;align-items:center;">
+                <input class="form-input" id="bt-tsl-pct" type="number" value="7" min="1" max="50" step="0.5"
+                  oninput="onTslPctChange()"
+                  style="font-size:13px;font-weight:700;color:var(--red);flex:1;text-align:right;" />
+                <span style="font-size:13px;color:var(--text2);font-family:var(--mono);">%</span>
+              </div>
+              <div class="form-hint" id="bt-tsl-hint">Stop = peak × (1 − 7%) → locks in target − 7% minimum</div>
             </div>
-            <div class="form-hint" id="bt-tsl-hint">Stop = peak × (1 − 7%) → locks in target − 7% minimum</div>
+
+            <!-- Dynamic ATR sub-row -->
+            <div id="bt-tsl-atr-wrap" style="display:none;">
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <div style="display:flex;flex-direction:column;gap:2px;">
+                  <span style="font-size:10px;color:var(--text3);font-family:var(--mono);">ATR Lookback</span>
+                  <div style="display:flex;gap:4px;align-items:center;">
+                    <input class="form-input" id="bt-tsl-atr-period" type="number" value="20" min="5" max="252" step="1"
+                      style="width:60px;font-size:12px;font-weight:700;color:var(--red);text-align:right;" />
+                    <span style="font-size:11px;color:var(--text2);font-family:var(--mono);">days</span>
+                  </div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:2px;">
+                  <span style="font-size:10px;color:var(--text3);font-family:var(--mono);">Multiplier</span>
+                  <div style="display:flex;gap:4px;align-items:center;">
+                    <input class="form-input" id="bt-tsl-atr-mult" type="number" value="1.5" min="0.5" max="5" step="0.1"
+                      style="width:60px;font-size:12px;font-weight:700;color:var(--red);text-align:right;" />
+                    <span style="font-size:11px;color:var(--text2);font-family:var(--mono);">× ATR</span>
+                  </div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:2px;">
+                  <span style="font-size:10px;color:var(--text3);font-family:var(--mono);">Min TSL %</span>
+                  <div style="display:flex;gap:4px;align-items:center;">
+                    <input class="form-input" id="bt-tsl-atr-min" type="number" value="3" min="1" max="20" step="0.5"
+                      style="width:54px;font-size:12px;font-weight:700;color:var(--red);text-align:right;" />
+                    <span style="font-size:11px;color:var(--text2);font-family:var(--mono);">%</span>
+                  </div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:2px;">
+                  <span style="font-size:10px;color:var(--text3);font-family:var(--mono);">Max TSL %</span>
+                  <div style="display:flex;gap:4px;align-items:center;">
+                    <input class="form-input" id="bt-tsl-atr-max" type="number" value="20" min="5" max="50" step="0.5"
+                      style="width:54px;font-size:12px;font-weight:700;color:var(--red);text-align:right;" />
+                    <span style="font-size:11px;color:var(--text2);font-family:var(--mono);">%</span>
+                  </div>
+                </div>
+              </div>
+              <div class="form-hint" id="bt-tsl-atr-hint" style="margin-top:6px;">
+                TSL% = avg(daily range/close) over 20 days × 1.5, clamped to [3%, 20%]. Volatile stocks get wider stops.
+              </div>
+            </div>
           </div>
 
           <div id="bt-tsl-explainer" style="display:none;font-size:11px;font-family:var(--mono);color:var(--text2);line-height:1.7;padding:10px 12px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border);">
-            <strong style="color:var(--text);">Example (target 20%, TSL 7%):</strong><br/>
-            1. Stock hits +20% → TSL armed, trade stays open<br/>
-            2. Floor locked = 20% − 7% = <span style="color:var(--gold)">+13%</span> guaranteed<br/>
-            3. Stock runs to +30% → stop moves to 30%×0.93 = <span style="color:var(--gold)">+21%</span><br/>
-            4. Stock falls to stop → exit and lock profit ✓
+            <strong style="color:var(--text);">Fixed:</strong> same TSL% for every stock.<br/>
+            <strong style="color:var(--text);">Dynamic ATR:</strong> TSL% = stock's avg daily swing × multiplier, computed from data <em>before</em> your entry. Volatile stocks (wider swings) get a bigger stop — stable stocks get a tighter one — so you're not stopped out by normal noise.<br/>
+            e.g. TATAMOTORS ATR=3% × 1.5 = <span style="color:var(--gold)">4.5%</span> stop. HDFCBANK ATR=1.2% × 1.5 = <span style="color:var(--gold)">1.8%</span> stop.
           </div>
 
         </div>
@@ -1853,7 +1938,12 @@ function onTslModeChange() {
   const on = document.getElementById('bt-tsl-mode').value === 'on';
   document.getElementById('bt-tsl-pct-wrap').style.display  = on ? '' : 'none';
   document.getElementById('bt-tsl-explainer').style.display = on ? '' : 'none';
-  if (on) onTslPctChange();
+  if (on) { onTslMethodChange(); onTslPctChange(); }
+}
+function onTslMethodChange() {
+  const method = document.getElementById('bt-tsl-method').value;
+  document.getElementById('bt-tsl-fixed-wrap').style.display = method === 'fixed' ? '' : 'none';
+  document.getElementById('bt-tsl-atr-wrap').style.display   = method === 'atr'   ? '' : 'none';
 }
 function onTslPctChange() {
   const pct = parseFloat(document.getElementById('bt-tsl-pct').value) || 7;
@@ -1899,14 +1989,27 @@ function collectFilters() {
   const targets = Array.from(targetInputs).map(inp => parseFloat(inp.value) || _DEF[parseInt(inp.dataset.tidx)]);
   const avgMode      = document.getElementById('bt-avg-mode').value;
   const avgFillGuard = document.getElementById('bt-avg-fill-guard').checked;
-  const tslOn   = document.getElementById('bt-tsl-mode').value === 'on';
-  const trailSL = tslOn ? (parseFloat(document.getElementById('bt-tsl-pct').value) || 7) : 0;
+  const tslOn     = document.getElementById('bt-tsl-mode').value === 'on';
+  const tslMethod = tslOn ? document.getElementById('bt-tsl-method').value : 'fixed';
+  const trailSL   = tslOn && tslMethod === 'fixed'
+    ? (parseFloat(document.getElementById('bt-tsl-pct').value) || 7) : 0;
+  const tslAtr = tslOn && tslMethod === 'atr' ? {
+    period : parseInt(document.getElementById('bt-tsl-atr-period').value) || 20,
+    mult   : parseFloat(document.getElementById('bt-tsl-atr-mult').value)  || 1.5,
+    min    : parseFloat(document.getElementById('bt-tsl-atr-min').value)   || 3,
+    max    : parseFloat(document.getElementById('bt-tsl-atr-max').value)   || 20,
+  } : null;
   // Drawdown levels — only relevant when avgMode === 'drawdown'
   const ddInputs     = document.querySelectorAll('#bt-drawdown-container input[data-ddidx]');
   const drawdownPcts = avgMode === 'drawdown'
     ? Array.from(ddInputs).map(inp => parseFloat(inp.value) || 10)
     : [];
   const maxHoldDays  = parseInt(document.getElementById('bt-max-hold').value) || 0;
+  const timeAvgs     = [
+    parseInt(document.getElementById('bt-yr1-avg').value) || 0,
+    parseInt(document.getElementById('bt-yr2-avg').value) || 0,
+    parseInt(document.getElementById('bt-yr3-avg').value) || 0,
+  ];
   const lookback     = parseInt(document.getElementById('bt-lookback').value) || 20;
   return {
     maType:    document.getElementById('bt-ma-type').value,
@@ -1920,8 +2023,10 @@ function collectFilters() {
     avgFillGuard,
     drawdownPcts,
     maxHoldDays,
+    timeAvgs,
     lookback,
     trailSL,
+    tslAtr,
   };
 }
 
@@ -1939,7 +2044,7 @@ function runBacktest() {
   const riskPct  = riskMode === 'pct' ? riskVal : (riskVal / capital) * 100;
 
   const universe = state_bt_universe.current;
-  const fq = \`&maType=\${filters.maType}&maPeriod=\${filters.maPeriod}&w52filter=\${filters.w52filter}&volFilter=\${filters.volFilter}&rsiFilter=\${filters.rsiFilter}&maxAvg=\${filters.maxAvg}&targets=\${encodeURIComponent(filters.targets.join(','))}&riskPct=\${riskPct}&universe=\${universe}&avgMode=\${filters.avgMode}&avgFillGuard=\${filters.avgFillGuard ? '1' : '0'}&drawdownPcts=\${encodeURIComponent(filters.drawdownPcts.join(','))}&maxHoldDays=\${filters.maxHoldDays}&lookback=\${filters.lookback}&trailSL=\${filters.trailSL}\`;
+  const fq = \`&maType=\${filters.maType}&maPeriod=\${filters.maPeriod}&w52filter=\${filters.w52filter}&volFilter=\${filters.volFilter}&rsiFilter=\${filters.rsiFilter}&maxAvg=\${filters.maxAvg}&targets=\${encodeURIComponent(filters.targets.join(','))}&riskPct=\${riskPct}&universe=\${universe}&avgMode=\${filters.avgMode}&avgFillGuard=\${filters.avgFillGuard ? '1' : '0'}&drawdownPcts=\${encodeURIComponent(filters.drawdownPcts.join(','))}&maxHoldDays=\${filters.maxHoldDays}&timeAvgs=\${filters.timeAvgs.join(',')}&lookback=\${filters.lookback}&trailSL=\${filters.trailSL}&tslAtrPeriod=\${filters.tslAtr ? filters.tslAtr.period : 0}&tslAtrMult=\${filters.tslAtr ? filters.tslAtr.mult : 0}&tslAtrMin=\${filters.tslAtr ? filters.tslAtr.min : 0}&tslAtrMax=\${filters.tslAtr ? filters.tslAtr.max : 0}\`;
 
   // Also call onMaxAvgChange immediately after load to seed the dynamic rows if not yet rendered
   if (!document.querySelector('#bt-targets-container input')) onMaxAvgChange();
@@ -3430,6 +3535,15 @@ function spreadAvgs(avgs) {
   return out;
 }
 
+// Compute ATR% = average of (high-low)/close over `period` days before row index `i`
+function calcATRpct(rows, period, i) {
+  const start = Math.max(0, i - period);
+  const slice = rows.slice(start, i);
+  if (slice.length < 3) return null;
+  const avg = slice.reduce((s, r) => s + (r.high - r.low) / r.close, 0) / slice.length;
+  return +(avg * 100).toFixed(3);  // as percentage
+}
+
 function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, opts = {}) {
   const { maType = 'none', maPeriod = 200, w52filter = 'none',
           volFilter = 'none', rsiFilter = 'none',
@@ -3439,15 +3553,17 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
           avgFillGuard = false,        // true = block average if fill >= entryPrice
           drawdownLevels = [],         // [10,20,30] % drops from entryPrice for drawdown mode
           maxHold = 0,                 // 0 = disabled; >0 = force-close at today.close after N days
+          timeAvgs = [1, 2, 3],        // extra averages unlocked after [1yr, 2yr, 3yr]
           lookbackN = 20,              // rolling window for High/Low signal (default 20)
-          trailSLPct = 0 } = opts;     // 0 = TSL off, >0 = trail % after target hit
+          trailSLPct = 0,              // 0 = TSL off, >0 = trail % after target hit
+          tslAtrCfg = null } = opts;  // null = fixed; {period,mult,min,max} = dynamic ATR
 
   const TOLERANCE     = 0.005;
   const needMA        = maType !== 'none';
   const need52W       = w52filter !== 'none';
   const needVol       = volFilter !== 'none';
   const needRSI       = rsiFilter !== 'none';
-  const needTSL       = trailSLPct > 0;
+  const needTSL       = trailSLPct > 0 || tslAtrCfg !== null;
   const volMult       = parseFloat(volFilter) || 1;
   let   runningCapital = initialCapital;          // compounds as trades close
 
@@ -3499,7 +3615,7 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
         // A1: TSL already armed — check for stop hit today
         if (pos.tslArmed) {
           if (today.high > pos.tslPeak) pos.tslPeak = today.high;
-          const stopPrice = pos.tslPeak * (1 - trailSLPct / 100);
+          const stopPrice = pos.tslPeak * (1 - pos.tslPct / 100);
           if (today.low <= stopPrice) {
             const exitPx = +Math.min(today.open, stopPrice).toFixed(2);
             const qty    = pos.totalInvested / pos.avgPrice;
@@ -3513,7 +3629,7 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
               avg_count: pos.avgCount, exit_reason: 'TSL',
               hold_days: holdDays, target_pct: +(tp * 100).toFixed(1),
               capital_after: +runningCapital.toFixed(2),
-              tsl_pct: trailSLPct,
+              tsl_pct: pos.tslPct,
               profit_locked_pct: +((exitPx - pos.avgPrice) / pos.avgPrice * 100).toFixed(2),
               tsl_floor_pct: +pos.tslFloorPct.toFixed(2),
               ...spreadAvgs(pos.avgs),
@@ -3528,7 +3644,7 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
         if (today.high >= tgt) {
           pos.tslArmed    = true;
           pos.tslPeak     = today.high;
-          pos.tslFloorPct = tp * 100 - trailSLPct;   // minimum profit locked
+          pos.tslFloorPct = tp * 100 - pos.tslPct;   // minimum profit locked
           continue;
         }
 
@@ -3553,9 +3669,12 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
         }
       }
 
-      // Time-based extra averages: each full year held beyond year 1 unlocks +1 avg
-      // >1yr → +1, >2yr → +2, >3yr → +3  (capped at +3 total extra)
-      const extraAvgs        = holdDays >= 1095 ? 3 : holdDays >= 730 ? 2 : holdDays >= 365 ? 1 : 0;
+      // Time-based extra averages — user-defined per year bracket
+      // timeAvgs[0]=+N after 1yr, [1]=+N after 2yr, [2]=+N after 3yr
+      const extraAvgs = holdDays >= 1095 ? (timeAvgs[2] || 0)
+                      : holdDays >=  730 ? (timeAvgs[1] || 0)
+                      : holdDays >=  365 ? (timeAvgs[0] || 0)
+                      : 0;
       const effectiveMaxAvgs = maxAverages + extraAvgs;
 
       if (pos.avgCount < effectiveMaxAvgs) {
@@ -3681,6 +3800,17 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
           // A gap-up means the stock never traded AT the 20D-high trigger price —
           // the real execution would be at today's open (the first available price).
           const fillPrice  = Math.max(gtt.trigger, today.open);
+          // Compute per-stock TSL% at entry time when dynamic ATR mode is active
+          let posTslPct = trailSLPct;  // default: fixed global %
+          if (tslAtrCfg) {
+            const atr = calcATRpct(rows, tslAtrCfg.period, i);
+            if (atr !== null) {
+              const raw = atr * tslAtrCfg.mult;
+              posTslPct = Math.min(tslAtrCfg.max, Math.max(tslAtrCfg.min, +raw.toFixed(2)));
+            } else {
+              posTslPct = tslAtrCfg.min;  // fallback if not enough history
+            }
+          }
           pos = { entryDate: d, avgPrice: fillPrice,
                   entryPrice: fillPrice,              // original buy price — never changes
                   totalInvested: tradeSize, avgCount: 0,
@@ -3688,6 +3818,7 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
                   maxHighAfterAvg: fillPrice,   // resets on each average
                   lastAvgIdx: i,                // row index of last buy/avg
                   avgs: [],                     // [{date, price}] for each average-down
+                  tslPct: posTslPct,            // this trade's effective TSL% (fixed or ATR-derived)
                   tslArmed: false, tslPeak: fillPrice, tslFloorPct: 0 };
           gtt = null;
           continue;
@@ -3744,7 +3875,7 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
       ? +((peakForReport - pos.avgPrice) / pos.avgPrice * 100).toFixed(2)
       : 0;
     const currentTslStop = (needTSL && pos.tslArmed)
-      ? +(pos.tslPeak * (1 - trailSLPct / 100)).toFixed(2)
+      ? +(pos.tslPeak * (1 - pos.tslPct / 100)).toFixed(2)
       : null;
     trades.push({ symbol, entry_date: pos.entryDate, entry_price: +pos.entryPrice.toFixed(2),
       avg_cost: +pos.avgPrice.toFixed(2),
@@ -3800,7 +3931,10 @@ app.get('/api/backtest/run', async (req, res) => {
   const drawdownLevels = drawdownPcts ? drawdownPcts.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v) && v > 0) : [];
   const maxHold      = Math.max(0, parseInt(maxHoldDays) || 0);
   const lookbackN    = Math.max(5, Math.min(100, parseInt(lookback) || 20));
-  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', drawdownLevels, maxHold, lookbackN, trailSLPct };
+  const timeAvgsList = (req.query.timeAvgs || '1,2,3').split(',').map(v => Math.max(0, parseInt(v.trim()) || 0));
+  const atrPeriod    = parseInt(req.query.tslAtrPeriod) || 0;
+  const tslAtrCfg    = atrPeriod > 0 ? { period: atrPeriod, mult: parseFloat(req.query.tslAtrMult)||1.5, min: parseFloat(req.query.tslAtrMin)||3, max: parseFloat(req.query.tslAtrMax)||20 } : null;
+  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', drawdownLevels, maxHold, timeAvgs: timeAvgsList, lookbackN, trailSLPct, tslAtrCfg };
 
   if (!token || !clientId) {
     return res.status(400).json({ error: 'token and clientId required' });
@@ -4062,7 +4196,10 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
   const drawdownLevels = drawdownPcts ? drawdownPcts.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v) && v > 0) : [];
   const maxHold      = Math.max(0, parseInt(maxHoldDays) || 0);
   const lookbackN    = Math.max(5, Math.min(100, parseInt(lookback) || 20));
-  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', drawdownLevels, maxHold, lookbackN, trailSLPct };
+  const timeAvgsList = (req.query.timeAvgs || '1,2,3').split(',').map(v => Math.max(0, parseInt(v.trim()) || 0));
+  const atrPeriod    = parseInt(req.query.tslAtrPeriod) || 0;
+  const tslAtrCfg    = atrPeriod > 0 ? { period: atrPeriod, mult: parseFloat(req.query.tslAtrMult)||1.5, min: parseFloat(req.query.tslAtrMin)||3, max: parseFloat(req.query.tslAtrMax)||20 } : null;
+  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', drawdownLevels, maxHold, timeAvgs: timeAvgsList, lookbackN, trailSLPct, tslAtrCfg };
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
