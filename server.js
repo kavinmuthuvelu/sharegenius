@@ -1056,6 +1056,7 @@ const HTML_PAGE = `<!DOCTYPE html>
             <label class="form-label">Lookback Period (days)</label>
             <div style="display:flex;gap:6px;align-items:center;">
               <input class="form-input" id="bt-lookback" type="number" value="20" min="5" max="100" step="1"
+                oninput="onAvgModeChange()"
                 style="font-size:13px;font-weight:700;color:var(--cyan);width:80px;text-align:right;" />
               <span style="font-size:13px;color:var(--text2);font-family:var(--mono);">days</span>
             </div>
@@ -1136,11 +1137,11 @@ const HTML_PAGE = `<!DOCTYPE html>
           <div style="min-width:260px;">
             <label class="form-label">Averaging Trigger</label>
             <select class="form-input" id="bt-avg-mode" style="font-size:12px;padding:6px 8px;" onchange="onAvgModeChange()">
-              <option value="native">On any new 20D low signal</option>
+              <option value="native">On any new N-Day low signal</option>
               <option value="drawdown">At fixed % drawdown from first BUY price</option>
-              <option value="below_entry">On new 20D high below first BUY price</option>
+              <option value="below_entry">On new N-Day high below first BUY price</option>
             </select>
-            <div class="form-hint" id="bt-avg-mode-hint">Signal fires on any new 20-day low — GTT at 20D high</div>
+            <div class="form-hint" id="bt-avg-mode-hint">Signal fires on any new N-day low — GTT at N-day high (N = Lookback Period above)</div>
           </div>
           <!-- Drawdown level inputs (only shown when drawdown mode selected) -->
           <div id="bt-drawdown-wrap" style="display:none;min-width:320px;">
@@ -1993,11 +1994,11 @@ function onAvgModeChange() {
   const wrap = document.getElementById('bt-drawdown-wrap');
   wrap.style.display = mode === 'drawdown' ? '' : 'none';
   const hints = {
-    native:      'Signal fires on any new 20-day low — GTT at 20D high',
-    drawdown:    'Average when price drops the specified % below your first BUY price',
-    below_entry: 'GTT trigger (20D high) must be below first BUY price',
+    native:      () => { const n = document.getElementById('bt-lookback').value||20; return \`Signal fires on any new \${n}-day low — GTT at \${n}-day high\`; },
+    drawdown:    () => 'Average when price drops the specified % below your first BUY price',
+    below_entry: () => { const n = document.getElementById('bt-lookback').value||20; return \`GTT trigger (\${n}-day high) must be below first BUY price\`; },
   };
-  document.getElementById('bt-avg-mode-hint').textContent = hints[mode] || '';
+  document.getElementById('bt-avg-mode-hint').textContent = (hints[mode] || (() => ''))();
   if (mode === 'drawdown') buildDrawdownInputs();
 }
 
@@ -2548,7 +2549,7 @@ function _doExcelExport(trades) {
     // ── AVERAGING CONFIG ─────────────────────────────────────────────────────
     { Metric: '── AVERAGING CONFIG ──',    Value: '' },
     { Metric: 'Max Averages',              Value: g('bt-max-avg') },
-    { Metric: 'Averaging Trigger',         Value: avgMode === 'native' ? 'Any new 20D low signal' : avgMode === 'drawdown' ? 'Fixed % drawdown from entry' : '20D high below entry price' },
+    { Metric: 'Averaging Trigger',         Value: avgMode === 'native' ? 'Any new ' + (g('bt-lookback')||20) + 'D low signal' : avgMode === 'drawdown' ? 'Fixed % drawdown from entry' : (g('bt-lookback')||20) + 'D high below entry price' },
     { Metric: 'Drawdown Levels',           Value: avgMode === 'drawdown' ? ddVals : 'N/A' },
     { Metric: 'Target % per Level',        Value: targetVals },
     { Metric: 'Fill Price Guard',          Value: gb('bt-avg-fill-guard') ? 'On' : 'Off' },
