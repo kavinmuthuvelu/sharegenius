@@ -998,8 +998,8 @@ const HTML_PAGE = `<!DOCTYPE html>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
           <span style="font-size:12px;color:var(--text2);font-family:var(--mono);">UNIVERSE:</span>
-          <button class="idx-btn active" id="bt-uni-n50"  onclick="switchBtUniverse('NIFTY50')">NIFTY 50</button>
-          <button class="idx-btn"        id="bt-uni-n100" onclick="switchBtUniverse('NIFTY100')">NIFTY 100</button>
+          <button class="idx-btn"        id="bt-uni-n50"  onclick="switchBtUniverse('NIFTY50')">NIFTY 50</button>
+          <button class="idx-btn active" id="bt-uni-n100" onclick="switchBtUniverse('NIFTY100')">NIFTY 100</button>
         </div>
       </div>
 
@@ -1015,11 +1015,11 @@ const HTML_PAGE = `<!DOCTYPE html>
         </div>
         <div class="stat-card">
           <div class="stat-label">From Date</div>
-          <input class="form-input" id="bt-from" value="2021-01-01" type="date" style="margin-top:6px;font-size:12px;" />
+          <input class="form-input" id="bt-from" value="2016-01-01" type="date" style="margin-top:6px;font-size:12px;" />
         </div>
         <div class="stat-card">
           <div class="stat-label">To Date</div>
-          <input class="form-input" id="bt-to" value="2026-03-27" type="date" style="margin-top:6px;font-size:12px;" />
+          <input class="form-input" id="bt-to" value="2026-04-09" type="date" style="margin-top:6px;font-size:12px;" />
         </div>
       </div>
 
@@ -1055,7 +1055,7 @@ const HTML_PAGE = `<!DOCTYPE html>
           <div>
             <label class="form-label">Lookback Period (days)</label>
             <div style="display:flex;gap:6px;align-items:center;">
-              <input class="form-input" id="bt-lookback" type="number" value="20" min="5" max="100" step="1"
+              <input class="form-input" id="bt-lookback" type="number" value="5" min="5" max="100" step="1"
                 oninput="onAvgModeChange()"
                 style="font-size:13px;font-weight:700;color:var(--cyan);width:80px;text-align:right;" />
               <span style="font-size:13px;color:var(--text2);font-family:var(--mono);">days</span>
@@ -1139,7 +1139,7 @@ const HTML_PAGE = `<!DOCTYPE html>
             <select class="form-input" id="bt-avg-mode" style="font-size:12px;padding:6px 8px;" onchange="onAvgModeChange()">
               <option value="native">On any new N-Day low signal</option>
               <option value="drawdown">At fixed % drawdown from first BUY price</option>
-              <option value="below_entry">On new N-Day high below first BUY price</option>
+              <option value="below_entry" selected>On new N-Day high below first BUY price</option>
             </select>
             <div class="form-hint" id="bt-avg-mode-hint">Signal fires on any new N-day low — GTT at N-day high (N = Lookback Period above)</div>
           </div>
@@ -1152,7 +1152,7 @@ const HTML_PAGE = `<!DOCTYPE html>
           <div style="min-width:260px;">
             <label class="form-label">Fill Price Guard</label>
             <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-              <input type="checkbox" id="bt-avg-fill-guard" style="width:16px;height:16px;accent-color:var(--cyan);cursor:pointer;" />
+              <input type="checkbox" id="bt-avg-fill-guard" checked style="width:16px;height:16px;accent-color:var(--cyan);cursor:pointer;" />
               <label for="bt-avg-fill-guard" style="font-size:12px;color:var(--text2);cursor:pointer;line-height:1.4;">
                 Block average if fill price ≥ initial buy price
               </label>
@@ -1216,7 +1216,7 @@ const HTML_PAGE = `<!DOCTYPE html>
             <label class="form-label">TSL Mode</label>
             <select class="form-input" id="bt-tsl-mode" onchange="onTslModeChange()" style="font-size:12px;padding:6px 8px;">
               <option value="none">Off — exit exactly at target</option>
-              <option value="on">On — trail after target hit</option>
+              <option value="on" selected>On — trail after target hit</option>
             </select>
             <div class="form-hint">When ON, trade stays open at target; TSL arms and trails the peak.</div>
           </div>
@@ -1226,7 +1226,7 @@ const HTML_PAGE = `<!DOCTYPE html>
             <select class="form-input" id="bt-tsl-method" onchange="onTslMethodChange()" style="font-size:12px;padding:6px 8px;margin-bottom:8px;">
               <option value="fixed">Fixed % — same trail for all stocks</option>
               <option value="atr">Dynamic — ATR-based (stock's own volatility)</option>
-              <option value="maxdd">Dynamic — Max Drawdown since listing (before entry)</option>
+              <option value="maxdd" selected>Dynamic — Max Drawdown since listing (before entry)</option>
             </select>
 
             <!-- Fixed % sub-row -->
@@ -1287,7 +1287,7 @@ const HTML_PAGE = `<!DOCTYPE html>
                 <div style="display:flex;flex-direction:column;gap:2px;">
                   <span style="font-size:10px;color:var(--text3);font-family:var(--mono);">% of Max DD to use</span>
                   <div style="display:flex;gap:4px;align-items:center;">
-                    <input class="form-input" id="bt-tsl-dd-pct" type="number" value="100" min="10" max="100" step="5"
+                    <input class="form-input" id="bt-tsl-dd-pct" type="number" value="75" min="10" max="100" step="5"
                       style="width:60px;font-size:12px;font-weight:700;color:var(--red);text-align:right;" />
                     <span style="font-size:11px;color:var(--text2);font-family:var(--mono);">%</span>
                   </div>
@@ -1303,7 +1303,7 @@ const HTML_PAGE = `<!DOCTYPE html>
                 <div style="display:flex;flex-direction:column;gap:2px;">
                   <span style="font-size:10px;color:var(--text3);font-family:var(--mono);">Max TSL %</span>
                   <div style="display:flex;gap:4px;align-items:center;">
-                    <input class="form-input" id="bt-tsl-dd-max" type="number" value="40" min="10" max="90" step="1"
+                    <input class="form-input" id="bt-tsl-dd-max" type="number" value="100" min="10" max="90" step="1"
                       style="width:54px;font-size:12px;font-weight:700;color:var(--red);text-align:right;" />
                     <span style="font-size:11px;color:var(--text2);font-family:var(--mono);">%</span>
                   </div>
@@ -1933,7 +1933,7 @@ function switchBtSource(src) {
   document.getElementById('bt-bhavcopy-info').style.display  = isDhan ? 'none' : 'block';
 }
 
-const state_bt_universe = { current: 'NIFTY50' };
+const state_bt_universe = { current: 'NIFTY100' };
 function switchBtUniverse(u) {
   state_bt_universe.current = u;
   document.querySelectorAll('#bt-uni-n50,#bt-uni-n100').forEach(b => b.classList.remove('active'));
@@ -1943,7 +1943,7 @@ function switchBtUniverse(u) {
 // Ordinal helper
 const _ORD = ['Initial Buy','After 1st Avg','After 2nd Avg','After 3rd Avg','After 4th Avg','After 5th Avg','After 6th Avg'];
 const _HINT = ['Before any averaging','After 1 average-down','After 2 average-downs','After 3 average-downs','After 4 average-downs','After 5 average-downs','After 6 average-downs'];
-const _DEF  = [20, 15, 10, 8, 6, 5, 4]; // default target %
+const _DEF  = [20, 15, 10, 5, 5, 5, 5]; // default target %
 
 function onMaxAvgChange() {
   const mode = document.getElementById('bt-avg-mode').value;
@@ -3105,7 +3105,9 @@ function updatePositionsBadge() {
 //  INIT
 // ═══════════════════════════════════════════════════════
 (async function init() {
-  onMaxAvgChange(); // seed dynamic averaging target cards on load
+  onMaxAvgChange();    // seed dynamic averaging target cards on load
+  onAvgModeChange();   // set correct averaging trigger hint
+  onTslModeChange();   // show TSL sub-rows matching default (on + maxdd)
   await Promise.all([loadWatchlist(), loadPositions()]);
 })();
 </script>
