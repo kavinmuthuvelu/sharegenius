@@ -2785,6 +2785,7 @@ function _doExcelExport(trades) {
     base['TSL Armed (open)']              = t.tsl_armed ? 'Yes' : '';
     base['TSL Current Stop \u20b9 (open)']= t.tsl_current_stop != null ? t.tsl_current_stop : '';
     base['Capital After \u20b9']          = t.capital_after != null ? t.capital_after : '';
+    base['Max Drawdown % (at entry)']   = t.max_drawdown_pct != null ? t.max_drawdown_pct : '';
     base['Exit Reason']                   = t.exit_reason;
     return base;
   });
@@ -2793,7 +2794,8 @@ function _doExcelExport(trades) {
   const fixedLeft  = [{wch:14},{wch:12},{wch:14},{wch:14}];
   const avgCols    = Array.from({length: maxAvgDepth}, () => [{wch:12},{wch:14}]).flat();
   const fixedRight = [{wch:12},{wch:13},{wch:13},{wch:10},{wch:9},{wch:9},{wch:12},{wch:10},
-                      {wch:10},{wch:20},{wch:22},{wch:24},{wch:14},{wch:26},{wch:16},{wch:12}];
+                      {wch:10},{wch:20},{wch:22},{wch:24},{wch:14},{wch:26},{wch:16},{wch:12},
+                      {wch:24}]; // Max Drawdown % (at entry)
   ws['!cols'] = [...fixedLeft, ...avgCols, ...fixedRight];
 
   // Summary sheet
@@ -4067,6 +4069,7 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
           avg_count: pos.avgCount, exit_reason: 'TIMEOUT',
           hold_days: holdDays, target_pct: +(targetPcts[Math.min(pos.avgCount, targetPcts.length - 1)] * 100).toFixed(1),
           capital_after: +runningCapital.toFixed(2),
+          max_drawdown_pct: pos.maxDrawdownPct,
           ...spreadAvgs(pos.avgs),
         });
         pos = null; gtt = null; continue;
@@ -4091,6 +4094,7 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
               avg_count: pos.avgCount, exit_reason: 'TSL',
               hold_days: holdDays, target_pct: +(tp * 100).toFixed(1),
               capital_after: +runningCapital.toFixed(2),
+              max_drawdown_pct: pos.maxDrawdownPct,
               tsl_pct: pos.tslPct,
               profit_locked_pct: +((exitPx - pos.avgPrice) / pos.avgPrice * 100).toFixed(2),
               tsl_floor_pct: +pos.tslFloorPct.toFixed(2),
@@ -4125,6 +4129,7 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
             avg_count: pos.avgCount, exit_reason: 'TARGET',
             hold_days: holdDays, target_pct: +(tp * 100).toFixed(1),
             capital_after: +runningCapital.toFixed(2),
+            max_drawdown_pct: pos.maxDrawdownPct,
             ...spreadAvgs(pos.avgs),
           });
           pos = null; gtt = null; continue;
@@ -4223,6 +4228,7 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
               avg_count: pos.avgCount, exit_reason: 'TARGET',
               hold_days: exitHold, target_pct: +(newTp * 100).toFixed(1),
               capital_after: +runningCapital.toFixed(2),
+              max_drawdown_pct: pos.maxDrawdownPct,
               ...spreadAvgs(pos.avgs),
             });
             pos = null; gtt = null; continue;
@@ -4286,6 +4292,9 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
               posTslPct = tslMaxDDCfg.min;  // fallback if not enough history
             }
           }
+          // Always compute max drawdown since listing up to entry — stored for Excel export
+          const entryMaxDD = calcMaxDrawdownPct(rows, i);
+
           pos = { entryDate: d, avgPrice: fillPrice,
                   entryPrice: fillPrice,              // original buy price — never changes
                   totalInvested: tradeSize, avgCount: 0,
@@ -4294,6 +4303,7 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
                   lastAvgIdx: i,                // row index of last buy/avg
                   avgs: [],                     // [{date, price}] for each average-down
                   lastBuyPrice: fillPrice,       // price of most recent buy (updated after each avg)
+                  maxDrawdownPct: entryMaxDD !== null ? +entryMaxDD.toFixed(2) : null,
                   tslPct: posTslPct,            // this trade's effective TSL% (fixed or ATR-derived)
                   tslArmed: false, tslPeak: fillPrice, tslFloorPct: 0 };
           gtt = null;
@@ -4358,6 +4368,7 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
       exit_date: last.date, exit_price: +ep.toFixed(2), invested: +pos.totalInvested.toFixed(2),
       pnl: +((ep - pos.avgPrice) * qty).toFixed(2),
       avg_count: pos.avgCount, exit_reason: 'OPEN',
+      max_drawdown_pct: pos.maxDrawdownPct,
       hold_days: holdDays, target_pct: +(tp * 100).toFixed(1),
       max_profit_pct: maxProfitPct,
       tsl_armed: pos.tslArmed || false,
