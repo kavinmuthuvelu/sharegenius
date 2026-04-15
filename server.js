@@ -1177,6 +1177,18 @@ const HTML_PAGE = `<!DOCTYPE html>
               Stricter than Fill Guard: avg 2 must be below avg 1 fill, avg 3 below avg 2, etc. — every layer is a lower price than the one before.
             </div>
           </div>
+          <div style="min-width:290px;">
+            <label class="form-label">Avg Cost Guard</label>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+              <input type="checkbox" id="bt-avgcost-guard" style="width:16px;height:16px;accent-color:var(--cyan);cursor:pointer;" />
+              <label for="bt-avgcost-guard" style="font-size:12px;color:var(--text2);cursor:pointer;line-height:1.4;">
+                Each average must fill below current <em>blended avg cost</em>
+              </label>
+            </div>
+            <div class="form-hint" style="margin-top:4px;">
+              Fill price must be &lt; blended avg cost at that moment — not just below entry or previous fill. Guarantees every average actually lowers the avg cost.
+            </div>
+          </div>
           <div style="font-size:11px;font-family:var(--mono);color:var(--text3);line-height:1.6;padding-bottom:20px;">
             Each row below is the <strong style="color:var(--text2)">exit target %</strong> for that holding state.<br/>
             Lower targets after averaging reflect higher averaged cost &amp; risk.
@@ -2352,7 +2364,8 @@ function collectFilters() {
   const targets = Array.from(targetInputs).map(inp => parseFloat(inp.value) || _DEF[parseInt(inp.dataset.tidx)]);
   const avgMode      = document.getElementById('bt-avg-mode').value;
   const avgFillGuard = document.getElementById('bt-avg-fill-guard').checked;
-  const stepGuard    = document.getElementById('bt-step-guard').checked;
+  const stepGuard      = document.getElementById('bt-step-guard').checked;
+  const avgCostGuard   = document.getElementById('bt-avgcost-guard').checked;
   const tslOn     = document.getElementById('bt-tsl-mode').value === 'on';
   const tslMethod = tslOn ? document.getElementById('bt-tsl-method').value : 'fixed';
   const trailSL   = tslOn && tslMethod === 'fixed'
@@ -2391,6 +2404,7 @@ function collectFilters() {
     avgMode,
     avgFillGuard,
     stepGuard,
+    avgCostGuard,
     drawdownPcts,
     maxHoldDays,
     timeAvgs,
@@ -2415,7 +2429,7 @@ function runBacktest() {
   const riskPct  = riskMode === 'pct' ? riskVal : (riskVal / capital) * 100;
 
   const universe = state_bt_universe.current;
-  const fq = \`&maType=\${filters.maType}&maPeriod=\${filters.maPeriod}&w52filter=\${filters.w52filter}&volFilter=\${filters.volFilter}&rsiFilter=\${filters.rsiFilter}&maxAvg=\${filters.maxAvg}&targets=\${encodeURIComponent(filters.targets.join(','))}&riskPct=\${riskPct}&universe=\${universe}&avgMode=\${filters.avgMode}&avgFillGuard=\${filters.avgFillGuard ? '1' : '0'}&stepGuard=\${filters.stepGuard ? '1' : '0'}&drawdownPcts=\${encodeURIComponent(filters.drawdownPcts.join(','))}&maxHoldDays=\${filters.maxHoldDays}&timeAvgs=\${filters.timeAvgs.join(',')}&lookback=\${filters.lookback}&trailSL=\${filters.trailSL}&tslAtrPeriod=\${filters.tslAtr ? filters.tslAtr.period : 0}&tslAtrMult=\${filters.tslAtr ? filters.tslAtr.mult : 0}&tslAtrMin=\${filters.tslAtr ? filters.tslAtr.min : 0}&tslAtrMax=\${filters.tslAtr ? filters.tslAtr.max : 0}&tslDDMin=\${filters.tslMaxDD ? filters.tslMaxDD.min : 0}&tslDDMax=\${filters.tslMaxDD ? filters.tslMaxDD.max : 0}&tslDDPct=\${filters.tslMaxDD ? filters.tslMaxDD.pct : 100}\`;
+  const fq = \`&maType=\${filters.maType}&maPeriod=\${filters.maPeriod}&w52filter=\${filters.w52filter}&volFilter=\${filters.volFilter}&rsiFilter=\${filters.rsiFilter}&maxAvg=\${filters.maxAvg}&targets=\${encodeURIComponent(filters.targets.join(','))}&riskPct=\${riskPct}&universe=\${universe}&avgMode=\${filters.avgMode}&avgFillGuard=\${filters.avgFillGuard ? '1' : '0'}&stepGuard=\${filters.stepGuard ? '1' : '0'}&avgCostGuard=\${filters.avgCostGuard ? '1' : '0'}&drawdownPcts=\${encodeURIComponent(filters.drawdownPcts.join(','))}&maxHoldDays=\${filters.maxHoldDays}&timeAvgs=\${filters.timeAvgs.join(',')}&lookback=\${filters.lookback}&trailSL=\${filters.trailSL}&tslAtrPeriod=\${filters.tslAtr ? filters.tslAtr.period : 0}&tslAtrMult=\${filters.tslAtr ? filters.tslAtr.mult : 0}&tslAtrMin=\${filters.tslAtr ? filters.tslAtr.min : 0}&tslAtrMax=\${filters.tslAtr ? filters.tslAtr.max : 0}&tslDDMin=\${filters.tslMaxDD ? filters.tslMaxDD.min : 0}&tslDDMax=\${filters.tslMaxDD ? filters.tslMaxDD.max : 0}&tslDDPct=\${filters.tslMaxDD ? filters.tslMaxDD.pct : 100}\`;
 
   // Also call onMaxAvgChange immediately after load to seed the dynamic rows if not yet rendered
   if (!document.querySelector('#bt-targets-container input')) onMaxAvgChange();
@@ -2883,6 +2897,7 @@ function _doExcelExport(trades) {
     { Metric: 'Target % per Level',        Value: targetVals },
     { Metric: 'Fill Price Guard',          Value: gb('bt-avg-fill-guard') ? 'On' : 'Off' },
     { Metric: 'Step-Down Guard',           Value: gb('bt-step-guard') ? 'On' : 'Off' },
+    { Metric: 'Avg Cost Guard',             Value: gb('bt-avgcost-guard') ? 'On' : 'Off' },
     { Metric: 'Extra Avgs after 1yr',      Value: g('bt-yr1-avg') },
     { Metric: 'Extra Avgs after 2yr',      Value: g('bt-yr2-avg') },
     { Metric: 'Extra Avgs after 3yr',      Value: g('bt-yr3-avg') },
@@ -4014,6 +4029,7 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
           avgMode = 'native',          // 'native' | 'drawdown' | 'below_entry'
           avgFillGuard = false,        // true = block average if fill >= entryPrice
           stepGuard = false,           // true = each average must fill below PREVIOUS buy price
+          avgCostGuard = false,        // true = each average must fill below current blended avg cost
           drawdownLevels = [],         // [10,20,30] % drops from entryPrice for drawdown mode
           maxHold = 0,                 // 0 = disabled; >0 = force-close at today.close after N days
           timeAvgs = [1, 2, 3],        // extra averages unlocked after [1yr, 2yr, 3yr]
@@ -4187,6 +4203,12 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
           // Step-down guard: each averaging fill must be strictly below the PREVIOUS
           // buy price (entry or last average), ensuring every layer is cheaper than the one before.
           if (stepGuard && ap >= pos.lastBuyPrice) {
+            gtt = null; continue;
+          }
+          // Avg-cost guard: fill must be below the current BLENDED average cost.
+          // Guarantees every average actually pulls the avg cost down.
+          // Note: pos.avgPrice is the blended cost BEFORE this average fires.
+          if (avgCostGuard && ap >= pos.avgPrice) {
             gtt = null; continue;
           }
 
@@ -4423,7 +4445,7 @@ app.get('/api/backtest/run', async (req, res) => {
   const tslAtrCfg    = atrPeriod > 0 ? { period: atrPeriod, mult: parseFloat(req.query.tslAtrMult)||1.5, min: parseFloat(req.query.tslAtrMin)||3, max: parseFloat(req.query.tslAtrMax)||20 } : null;
   const ddMin        = parseFloat(req.query.tslDDMin) || 0;
   const tslMaxDDCfg  = ddMin > 0 ? { pct: Math.min(100, Math.max(1, parseFloat(req.query.tslDDPct)||100)), min: ddMin, max: parseFloat(req.query.tslDDMax)||40 } : null;
-  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', stepGuard: (req.query.stepGuard||'0') === '1', drawdownLevels, maxHold, timeAvgs: timeAvgsList, lookbackN, trailSLPct, tslAtrCfg, tslMaxDDCfg };
+  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', stepGuard: (req.query.stepGuard||'0') === '1', avgCostGuard: (req.query.avgCostGuard||'0') === '1', drawdownLevels, maxHold, timeAvgs: timeAvgsList, lookbackN, trailSLPct, tslAtrCfg, tslMaxDDCfg };
 
   if (!token || !clientId) {
     return res.status(400).json({ error: 'token and clientId required' });
@@ -4690,7 +4712,7 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
   const tslAtrCfg    = atrPeriod > 0 ? { period: atrPeriod, mult: parseFloat(req.query.tslAtrMult)||1.5, min: parseFloat(req.query.tslAtrMin)||3, max: parseFloat(req.query.tslAtrMax)||20 } : null;
   const ddMin        = parseFloat(req.query.tslDDMin) || 0;
   const tslMaxDDCfg  = ddMin > 0 ? { pct: Math.min(100, Math.max(1, parseFloat(req.query.tslDDPct)||100)), min: ddMin, max: parseFloat(req.query.tslDDMax)||40 } : null;
-  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', stepGuard: (req.query.stepGuard||'0') === '1', drawdownLevels, maxHold, timeAvgs: timeAvgsList, lookbackN, trailSLPct, tslAtrCfg, tslMaxDDCfg };
+  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', stepGuard: (req.query.stepGuard||'0') === '1', avgCostGuard: (req.query.avgCostGuard||'0') === '1', drawdownLevels, maxHold, timeAvgs: timeAvgsList, lookbackN, trailSLPct, tslAtrCfg, tslMaxDDCfg };
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
