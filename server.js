@@ -694,6 +694,10 @@ const HTML_PAGE = `<!DOCTYPE html>
     <button class="tab-btn" onclick="switchTab('portfolio')" id="tab-portfolio">
       <span class="tab-icon">🏦</span> Portfolio
     </button>
+    <button class="tab-btn" onclick="switchTab('signals')" id="tab-signals">
+      <span class="tab-icon">🎯</span> Daily Signals
+      <span class="tab-badge" id="badge-signals" style="background:var(--red);">0</span>
+    </button>
   </nav>
 
   <!-- ═══════ MAIN CONTENT ══════════════════════════════ -->
@@ -1161,6 +1165,18 @@ const HTML_PAGE = `<!DOCTYPE html>
               Catches gap-up days where actual fill exceeds your first buy even if signal looked valid
             </div>
           </div>
+          <div style="min-width:290px;">
+            <label class="form-label">Step-Down Guard</label>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+              <input type="checkbox" id="bt-step-guard" style="width:16px;height:16px;accent-color:var(--cyan);cursor:pointer;" />
+              <label for="bt-step-guard" style="font-size:12px;color:var(--text2);cursor:pointer;line-height:1.4;">
+                Each average must fill below the <em>previous</em> buy price
+              </label>
+            </div>
+            <div class="form-hint" style="margin-top:4px;">
+              Stricter than Fill Guard: avg 2 must be below avg 1 fill, avg 3 below avg 2, etc. — every layer is a lower price than the one before.
+            </div>
+          </div>
           <div style="font-size:11px;font-family:var(--mono);color:var(--text3);line-height:1.6;padding-bottom:20px;">
             Each row below is the <strong style="color:var(--text2)">exit target %</strong> for that holding state.<br/>
             Lower targets after averaging reflect higher averaged cost &amp; risk.
@@ -1555,6 +1571,136 @@ const HTML_PAGE = `<!DOCTYPE html>
       </div>
     </div>
 
+    <!-- ─── SIGNALS PANEL ──────────────────────────────────── -->
+    <div class="panel" id="panel-signals">
+      <div class="section-header">
+        <div>
+          <div class="section-title">🎯 Daily Signals — Live NSE Strategy</div>
+          <div class="section-subtitle" id="sig-subtitle">Connect your Dhan account to generate today's signals</div>
+        </div>
+        <div class="section-actions">
+          <button class="btn btn-primary" onclick="runSignals()" id="sig-run-btn">⚡ Run Signals</button>
+        </div>
+      </div>
+
+      <!-- Credentials -->
+      <div style="display:grid;grid-template-columns:1fr 2fr auto;gap:10px;margin-bottom:12px;align-items:end;">
+        <div class="stat-card" style="padding:10px 12px;">
+          <div class="stat-label">Dhan Client ID</div>
+          <input class="form-input" id="sig-client-id" placeholder="Your Client ID" style="margin-top:4px;font-size:12px;" />
+        </div>
+        <div class="stat-card" style="padding:10px 12px;">
+          <div class="stat-label">Dhan Access Token</div>
+          <input class="form-input" id="sig-token" type="password" placeholder="Paste today's token" style="margin-top:4px;font-size:12px;" />
+        </div>
+        <div>
+          <button class="btn btn-primary" style="height:38px;" onclick="runSignals()">Run Now</button>
+        </div>
+      </div>
+      <div class="form-hint" style="margin-bottom:16px;">
+        ℹ️ Scans NIFTY 100 (5-day lookback, N-Day high below entry, TSL = MaxDD × 75%) against live Yahoo Finance prices + your Dhan portfolio. Read-only — no orders placed.
+      </div>
+
+      <!-- Progress -->
+      <div id="sig-progress-wrap" style="display:none;margin-bottom:16px;">
+        <div class="progress-meta">
+          <span id="sig-progress-label">Scanning NIFTY 100...</span>
+          <span id="sig-progress-pct">0%</span>
+        </div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="sig-progress-fill"></div></div>
+      </div>
+
+      <!-- Error -->
+      <div id="sig-error" style="display:none;background:var(--red-bg);border:1px solid var(--red);border-radius:var(--radius);padding:10px 14px;font-size:12px;font-family:var(--mono);color:var(--red);margin-bottom:12px;"></div>
+
+      <!-- Results -->
+      <div id="sig-results" style="display:none;">
+
+        <!-- S1 -->
+        <div style="margin-bottom:20px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <div style="font-size:14px;font-weight:700;color:var(--green);">📋 Signal 1 — Add to Watchlist &amp; Place GTT</div>
+            <span class="tab-badge green" id="sig-s1-count">0</span>
+          </div>
+          <div class="form-hint" style="margin-bottom:8px;">Stocks at their 5-day low today — NOT already in your Dhan holdings. Set GTT at the 5-day high.</div>
+          <div class="table-wrap"><table>
+            <thead><tr>
+              <th>Symbol</th><th class="num">CMP ₹</th><th class="num">5D Low ₹</th>
+              <th class="num" style="color:var(--gold)">GTT Trigger ₹</th>
+              <th class="num">Day Low ₹</th><th class="num">Change%</th>
+            </tr></thead>
+            <tbody id="sig-s1-tbody"><tr class="empty-row"><td colspan="6">No signals today</td></tr></tbody>
+          </table></div>
+        </div>
+
+        <!-- S2 -->
+        <div style="margin-bottom:20px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <div style="font-size:14px;font-weight:700;color:var(--cyan);">🔄 Signal 2 — Update GTT Orders</div>
+            <span class="tab-badge" id="sig-s2-count">0</span>
+          </div>
+          <div class="form-hint" style="margin-bottom:8px;">Stocks in your Dhan Forever Orders whose 5-day high has shifted by &gt;0.2%. Update the GTT trigger.</div>
+          <div class="table-wrap"><table>
+            <thead><tr>
+              <th>Symbol</th><th class="num">CMP ₹</th>
+              <th class="num">Current GTT ₹</th>
+              <th class="num" style="color:var(--gold)">New GTT ₹</th>
+              <th class="num">Δ ₹</th>
+            </tr></thead>
+            <tbody id="sig-s2-tbody"><tr class="empty-row"><td colspan="5">No GTT updates needed</td></tr></tbody>
+          </table></div>
+        </div>
+
+        <!-- S3 -->
+        <div style="margin-bottom:20px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <div style="font-size:14px;font-weight:700;color:var(--gold);">➕ Signal 3 — Average Down</div>
+            <span class="tab-badge" style="background:var(--gold);" id="sig-s3-count">0</span>
+          </div>
+          <div class="form-hint" style="margin-bottom:8px;">Holdings at 5-day low where 5-day high is BELOW your average cost. Place averaging GTT.</div>
+          <div class="table-wrap"><table>
+            <thead><tr>
+              <th>Symbol</th><th class="num">Qty</th><th class="num">Avg Cost ₹</th>
+              <th class="num">CMP ₹</th><th class="num">Unrealised%</th>
+              <th class="num" style="color:var(--gold)">Avg GTT ₹</th>
+            </tr></thead>
+            <tbody id="sig-s3-tbody"><tr class="empty-row"><td colspan="6">No averaging signals</td></tr></tbody>
+          </table></div>
+        </div>
+
+        <!-- S4 -->
+        <div style="margin-bottom:20px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <div style="font-size:14px;font-weight:700;color:var(--red);">🛑 Signal 4 — Arm Trailing Stop Loss</div>
+            <span class="tab-badge" style="background:var(--red);" id="sig-s4-count">0</span>
+          </div>
+          <div class="form-hint" style="margin-bottom:8px;">Holdings where CMP ≥ 20% above avg cost. Set TSL = Historical MaxDD × 75%, clamped to [5%, 100%].</div>
+          <div class="table-wrap"><table>
+            <thead><tr>
+              <th>Symbol</th><th class="num">Qty</th><th class="num">Avg Cost ₹</th>
+              <th class="num up">CMP ₹</th><th class="num">Target ₹</th>
+              <th class="num" style="color:var(--red)">TSL%</th>
+              <th class="num" style="color:var(--red)">Stop ₹</th>
+              <th class="num">Profit%</th>
+            </tr></thead>
+            <tbody id="sig-s4-tbody"><tr class="empty-row"><td colspan="8">No TSL signals</td></tr></tbody>
+          </table></div>
+        </div>
+
+      </div><!-- /sig-results -->
+
+      <!-- Empty state -->
+      <div id="sig-empty" style="text-align:center;padding:60px 20px;color:var(--text3);">
+        <div style="font-size:40px;margin-bottom:12px;opacity:0.4">🎯</div>
+        <div style="font-size:16px;font-weight:700;color:var(--text2);margin-bottom:6px;">Your daily trading signals</div>
+        <div style="font-size:13px;font-family:var(--mono);line-height:1.8;">
+          Enter your Dhan token and click <strong>Run Signals</strong>.<br/>
+          Best run at <strong>7:00 AM IST</strong> — uses previous day close for all calculations.
+        </div>
+      </div>
+    </div>
+
+
   </main>
 </div>
 
@@ -1711,6 +1857,185 @@ function switchTab(tab) {
   document.getElementById('tab-' + tab).classList.add('active');
   if (tab === 'watchlist') loadWatchlist();
   if (tab === 'positions') loadPositions();
+}
+
+
+// ═══════════════════════════════════════════════════════
+//  DAILY SIGNALS
+// ═══════════════════════════════════════════════════════
+const SIG_N          = 5;     // lookback days
+const SIG_TARGET_PCT = 0.20;  // 20% target triggers TSL signal
+const SIG_TSL_DD     = 0.75;  // use 75% of max drawdown
+const SIG_TSL_MIN    = 5;     // min TSL %
+const SIG_TSL_MAX    = 100;   // max TSL %
+const SIG_TOLE       = 0.005; // 0.5% tolerance for N-day low match
+
+async function runSignals() {
+  const clientId = document.getElementById('sig-client-id').value.trim();
+  const token    = document.getElementById('sig-token').value.trim();
+  if (!token || !clientId) { toast('Enter Dhan Client ID and Access Token', 'error'); return; }
+
+  document.getElementById('sig-empty').style.display       = 'none';
+  document.getElementById('sig-results').style.display     = 'none';
+  document.getElementById('sig-error').style.display       = 'none';
+  document.getElementById('sig-progress-wrap').style.display = '';
+  document.getElementById('sig-run-btn').disabled = true;
+
+  const setP = (label, pct) => {
+    document.getElementById('sig-progress-label').textContent = label;
+    document.getElementById('sig-progress-pct').textContent   = Math.round(pct) + '%';
+    document.getElementById('sig-progress-fill').style.width  = pct + '%';
+  };
+  const showErr = msg => {
+    document.getElementById('sig-error').textContent = '⚠️ ' + msg;
+    document.getElementById('sig-error').style.display = '';
+    document.getElementById('sig-progress-wrap').style.display = 'none';
+    document.getElementById('sig-run-btn').disabled = false;
+  };
+
+  try {
+    // Step 1: Fetch Dhan portfolio
+    setP('Fetching Dhan portfolio…', 5);
+    const hdrs = { 'x-dhan-token': token, 'x-dhan-client': clientId };
+    const [hRes, gRes] = await Promise.all([
+      fetch('/api/portfolio/holdings', { headers: hdrs }),
+      fetch('/api/portfolio/gtt',      { headers: hdrs }),
+    ]);
+    const holdings  = await hRes.json();
+    const gttOrders = await gRes.json();
+    if (holdings.error) throw new Error('Holdings: ' + holdings.error);
+
+    const holdMap = {};
+    for (const h of (Array.isArray(holdings) ? holdings : []))
+      holdMap[h.tradingSymbol] = h;
+    const gttMap = {};
+    for (const g of (Array.isArray(gttOrders) ? gttOrders : []))
+      if (g.tradingSymbol) gttMap[g.tradingSymbol] = g;
+
+    // Step 2: Stream live scan from backend
+    setP('Scanning NIFTY 100 via live data…', 10);
+    const scanData = await new Promise((resolve, reject) => {
+      const results = {};
+      const es = new EventSource('/api/signals/scan');
+      es.onmessage = ev => {
+        const msg = JSON.parse(ev.data);
+        if (msg.type === 'progress') {
+          setP(\`Scanning \${msg.symbol}…\`, 10 + (msg.current / msg.total) * 78);
+          if (msg.data) results[msg.symbol] = msg.data;
+        } else if (msg.type === 'complete') { es.close(); resolve(results); }
+        else if (msg.type === 'error')      { es.close(); reject(new Error(msg.message)); }
+      };
+      es.onerror = () => { es.close(); reject(new Error('Scan stream error')); };
+    });
+
+    setP('Generating signals…', 90);
+
+    // Step 3: Generate 4 signal arrays
+    const s1 = [], s2 = [], s3 = [], s4 = [];
+
+    for (const [symbol, d] of Object.entries(scanData)) {
+      const cmp    = d.currentPrice;
+      const highN  = d.highN;
+      const lowN   = d.lowN;
+      const isAtLow = d.isAtLow;
+      const inH    = !!holdMap[symbol];
+      const inG    = !!gttMap[symbol];
+
+      // S1: At N-day low, NOT in holdings
+      if (isAtLow && !inH)
+        s1.push({ symbol, cmp, lowN, highN, dayLow: d.dayLow, changePct: d.changePct });
+
+      // S2: In GTT, 5-day high shifted >0.2%
+      if (inG) {
+        const oldT = gttMap[symbol].triggerPrice || 0;
+        if (oldT > 0 && Math.abs(highN - oldT) / oldT > 0.002)
+          s2.push({ symbol, cmp, oldTrigger: oldT, newTrigger: highN, delta: highN - oldT });
+      }
+
+      // S3: In holdings, at N-day low, highN < avgCost (below_entry guard)
+      if (inH && isAtLow) {
+        const h = holdMap[symbol];
+        if (highN < h.avgCostPrice)
+          s3.push({ symbol, qty: h.totalQty, avgCost: h.avgCostPrice, cmp,
+            unrealisedPct: ((cmp - h.avgCostPrice) / h.avgCostPrice * 100).toFixed(1),
+            gttTrigger: highN });
+      }
+
+      // S4: In holdings, CMP >= target (20% above avg cost)
+      if (inH) {
+        const h      = holdMap[symbol];
+        const target = h.avgCostPrice * (1 + SIG_TARGET_PCT);
+        if (cmp >= target) {
+          const maxDD   = d.maxDrawdownPct || 20;
+          const tslPct  = +Math.min(SIG_TSL_MAX, Math.max(SIG_TSL_MIN, maxDD * SIG_TSL_DD)).toFixed(1);
+          const stopPx  = +(cmp * (1 - tslPct / 100)).toFixed(2);
+          s4.push({ symbol, qty: h.totalQty, avgCost: h.avgCostPrice, cmp, target,
+            tslPct, stopPrice: stopPx,
+            profitPct: ((cmp - h.avgCostPrice) / h.avgCostPrice * 100).toFixed(1) });
+        }
+      }
+    }
+
+    renderSignals(s1, s2, s3, s4);
+    const total = s1.length + s2.length + s3.length + s4.length;
+    document.getElementById('badge-signals').textContent = total || '0';
+    document.getElementById('sig-subtitle').textContent =
+      new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata'}) +
+      \` · \${total} signal\${total!==1?'s':''} across \${Object.keys(scanData).length} stocks\`;
+
+  } catch (err) { showErr(err.message); return; }
+
+  document.getElementById('sig-progress-wrap').style.display = 'none';
+  document.getElementById('sig-run-btn').disabled = false;
+}
+
+function renderSignals(s1, s2, s3, s4) {
+  document.getElementById('sig-results').style.display = '';
+  const f = (n, d=2) => n == null ? '—' : (+n).toLocaleString('en-IN',{minimumFractionDigits:d,maximumFractionDigits:d});
+
+  document.getElementById('sig-s1-count').textContent = s1.length;
+  document.getElementById('sig-s1-tbody').innerHTML = s1.length
+    ? s1.map(r => \`<tr>
+        <td><span class="sym-name">\${r.symbol}</span></td>
+        <td class="num">\${f(r.cmp)}</td><td class="num">\${f(r.lowN)}</td>
+        <td class="num" style="color:var(--gold);font-weight:700">\${f(r.highN)}</td>
+        <td class="num">\${f(r.dayLow)}</td>
+        <td class="num \${r.changePct>=0?'up':'down'}">\${r.changePct>=0?'+':''}\${f(r.changePct,1)}%</td>
+      </tr>\`).join('')
+    : '<tr class="empty-row"><td colspan="6">No new signals today</td></tr>';
+
+  document.getElementById('sig-s2-count').textContent = s2.length;
+  document.getElementById('sig-s2-tbody').innerHTML = s2.length
+    ? s2.map(r => \`<tr>
+        <td><span class="sym-name">\${r.symbol}</span></td>
+        <td class="num">\${f(r.cmp)}</td><td class="num">\${f(r.oldTrigger)}</td>
+        <td class="num" style="color:var(--gold);font-weight:700">\${f(r.newTrigger)}</td>
+        <td class="num \${r.delta>=0?'up':'down'}">\${r.delta>=0?'+':''}\${f(r.delta)}</td>
+      </tr>\`).join('')
+    : '<tr class="empty-row"><td colspan="5">No GTT updates needed</td></tr>';
+
+  document.getElementById('sig-s3-count').textContent = s3.length;
+  document.getElementById('sig-s3-tbody').innerHTML = s3.length
+    ? s3.map(r => \`<tr>
+        <td><span class="sym-name">\${r.symbol}</span></td>
+        <td class="num">\${r.qty}</td><td class="num">\${f(r.avgCost)}</td>
+        <td class="num">\${f(r.cmp)}</td>
+        <td class="num \${r.unrealisedPct>=0?'up':'down'}">\${r.unrealisedPct}%</td>
+        <td class="num" style="color:var(--gold);font-weight:700">\${f(r.gttTrigger)}</td>
+      </tr>\`).join('')
+    : '<tr class="empty-row"><td colspan="6">No averaging signals</td></tr>';
+
+  document.getElementById('sig-s4-count').textContent = s4.length;
+  document.getElementById('sig-s4-tbody').innerHTML = s4.length
+    ? s4.map(r => \`<tr class="alert-row">
+        <td><span class="sym-name">\${r.symbol}</span></td>
+        <td class="num">\${r.qty}</td><td class="num">\${f(r.avgCost)}</td>
+        <td class="num up">\${f(r.cmp)}</td><td class="num">\${f(r.target)}</td>
+        <td class="num" style="color:var(--red);font-weight:700">\${r.tslPct}%</td>
+        <td class="num" style="color:var(--red);font-weight:700">\${f(r.stopPrice)}</td>
+        <td class="num up">+\${r.profitPct}%</td>
+      </tr>\`).join('')
+    : '<tr class="empty-row"><td colspan="8">No TSL signals</td></tr>';
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2027,6 +2352,7 @@ function collectFilters() {
   const targets = Array.from(targetInputs).map(inp => parseFloat(inp.value) || _DEF[parseInt(inp.dataset.tidx)]);
   const avgMode      = document.getElementById('bt-avg-mode').value;
   const avgFillGuard = document.getElementById('bt-avg-fill-guard').checked;
+  const stepGuard    = document.getElementById('bt-step-guard').checked;
   const tslOn     = document.getElementById('bt-tsl-mode').value === 'on';
   const tslMethod = tslOn ? document.getElementById('bt-tsl-method').value : 'fixed';
   const trailSL   = tslOn && tslMethod === 'fixed'
@@ -2064,6 +2390,7 @@ function collectFilters() {
     targets,
     avgMode,
     avgFillGuard,
+    stepGuard,
     drawdownPcts,
     maxHoldDays,
     timeAvgs,
@@ -2088,7 +2415,7 @@ function runBacktest() {
   const riskPct  = riskMode === 'pct' ? riskVal : (riskVal / capital) * 100;
 
   const universe = state_bt_universe.current;
-  const fq = \`&maType=\${filters.maType}&maPeriod=\${filters.maPeriod}&w52filter=\${filters.w52filter}&volFilter=\${filters.volFilter}&rsiFilter=\${filters.rsiFilter}&maxAvg=\${filters.maxAvg}&targets=\${encodeURIComponent(filters.targets.join(','))}&riskPct=\${riskPct}&universe=\${universe}&avgMode=\${filters.avgMode}&avgFillGuard=\${filters.avgFillGuard ? '1' : '0'}&drawdownPcts=\${encodeURIComponent(filters.drawdownPcts.join(','))}&maxHoldDays=\${filters.maxHoldDays}&timeAvgs=\${filters.timeAvgs.join(',')}&lookback=\${filters.lookback}&trailSL=\${filters.trailSL}&tslAtrPeriod=\${filters.tslAtr ? filters.tslAtr.period : 0}&tslAtrMult=\${filters.tslAtr ? filters.tslAtr.mult : 0}&tslAtrMin=\${filters.tslAtr ? filters.tslAtr.min : 0}&tslAtrMax=\${filters.tslAtr ? filters.tslAtr.max : 0}&tslDDMin=\${filters.tslMaxDD ? filters.tslMaxDD.min : 0}&tslDDMax=\${filters.tslMaxDD ? filters.tslMaxDD.max : 0}&tslDDPct=\${filters.tslMaxDD ? filters.tslMaxDD.pct : 100}\`;
+  const fq = \`&maType=\${filters.maType}&maPeriod=\${filters.maPeriod}&w52filter=\${filters.w52filter}&volFilter=\${filters.volFilter}&rsiFilter=\${filters.rsiFilter}&maxAvg=\${filters.maxAvg}&targets=\${encodeURIComponent(filters.targets.join(','))}&riskPct=\${riskPct}&universe=\${universe}&avgMode=\${filters.avgMode}&avgFillGuard=\${filters.avgFillGuard ? '1' : '0'}&stepGuard=\${filters.stepGuard ? '1' : '0'}&drawdownPcts=\${encodeURIComponent(filters.drawdownPcts.join(','))}&maxHoldDays=\${filters.maxHoldDays}&timeAvgs=\${filters.timeAvgs.join(',')}&lookback=\${filters.lookback}&trailSL=\${filters.trailSL}&tslAtrPeriod=\${filters.tslAtr ? filters.tslAtr.period : 0}&tslAtrMult=\${filters.tslAtr ? filters.tslAtr.mult : 0}&tslAtrMin=\${filters.tslAtr ? filters.tslAtr.min : 0}&tslAtrMax=\${filters.tslAtr ? filters.tslAtr.max : 0}&tslDDMin=\${filters.tslMaxDD ? filters.tslMaxDD.min : 0}&tslDDMax=\${filters.tslMaxDD ? filters.tslMaxDD.max : 0}&tslDDPct=\${filters.tslMaxDD ? filters.tslMaxDD.pct : 100}\`;
 
   // Also call onMaxAvgChange immediately after load to seed the dynamic rows if not yet rendered
   if (!document.querySelector('#bt-targets-container input')) onMaxAvgChange();
@@ -2553,6 +2880,7 @@ function _doExcelExport(trades) {
     { Metric: 'Drawdown Levels',           Value: avgMode === 'drawdown' ? ddVals : 'N/A' },
     { Metric: 'Target % per Level',        Value: targetVals },
     { Metric: 'Fill Price Guard',          Value: gb('bt-avg-fill-guard') ? 'On' : 'Off' },
+    { Metric: 'Step-Down Guard',           Value: gb('bt-step-guard') ? 'On' : 'Off' },
     { Metric: 'Extra Avgs after 1yr',      Value: g('bt-yr1-avg') },
     { Metric: 'Extra Avgs after 2yr',      Value: g('bt-yr2-avg') },
     { Metric: 'Extra Avgs after 3yr',      Value: g('bt-yr3-avg') },
@@ -3683,6 +4011,7 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
           targetPcts = [0.20, 0.15, 0.10, 0.05],
           avgMode = 'native',          // 'native' | 'drawdown' | 'below_entry'
           avgFillGuard = false,        // true = block average if fill >= entryPrice
+          stepGuard = false,           // true = each average must fill below PREVIOUS buy price
           drawdownLevels = [],         // [10,20,30] % drops from entryPrice for drawdown mode
           maxHold = 0,                 // 0 = disabled; >0 = force-close at today.close after N days
           timeAvgs = [1, 2, 3],        // extra averages unlocked after [1yr, 2yr, 3yr]
@@ -3846,12 +4175,14 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
             ? Math.min(gtt.trigger, Math.max(gtt.trigger, today.open))  // at threshold or open
             : Math.max(gtt.trigger, today.open);                         // at trigger or open
 
-          // Fill-price guard: if enabled, cancel this average whenever the actual
-          // fill price is at or above the initial entry price — you'd be buying at
-          // the same level or higher than your first buy, which defeats averaging down.
+          // Fill-price guard: cancel if fill >= initial entry price (first buy).
           if (avgFillGuard && ap >= pos.entryPrice) {
-            gtt = null; // discard signal, wait for a genuinely lower entry
-            continue;
+            gtt = null; continue;
+          }
+          // Step-down guard: each averaging fill must be strictly below the PREVIOUS
+          // buy price (entry or last average), ensuring every layer is cheaper than the one before.
+          if (stepGuard && ap >= pos.lastBuyPrice) {
+            gtt = null; continue;
           }
 
           const tradeSize = runningCapital * (riskPct / 100);
@@ -3862,6 +4193,7 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
           pos.totalInvested += tradeSize;
           // Reset maxHighAfterAvg so maxProfitPct only reflects post-average peak
           pos.maxHighAfterAvg = ap;
+          pos.lastBuyPrice    = ap;  // step-down guard: next avg must be below this
           pos.lastAvgIdx      = i;  // remember which row this average fired on
           gtt = null;
 
@@ -3961,6 +4293,7 @@ function runStrategySimulation(symbol, rows, initialCapital, riskPct, fromDate, 
                   maxHighAfterAvg: fillPrice,   // resets on each average
                   lastAvgIdx: i,                // row index of last buy/avg
                   avgs: [],                     // [{date, price}] for each average-down
+                  lastBuyPrice: fillPrice,       // price of most recent buy (updated after each avg)
                   tslPct: posTslPct,            // this trade's effective TSL% (fixed or ATR-derived)
                   tslArmed: false, tslPeak: fillPrice, tslFloorPct: 0 };
           gtt = null;
@@ -4079,7 +4412,7 @@ app.get('/api/backtest/run', async (req, res) => {
   const tslAtrCfg    = atrPeriod > 0 ? { period: atrPeriod, mult: parseFloat(req.query.tslAtrMult)||1.5, min: parseFloat(req.query.tslAtrMin)||3, max: parseFloat(req.query.tslAtrMax)||20 } : null;
   const ddMin        = parseFloat(req.query.tslDDMin) || 0;
   const tslMaxDDCfg  = ddMin > 0 ? { pct: Math.min(100, Math.max(1, parseFloat(req.query.tslDDPct)||100)), min: ddMin, max: parseFloat(req.query.tslDDMax)||40 } : null;
-  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', drawdownLevels, maxHold, timeAvgs: timeAvgsList, lookbackN, trailSLPct, tslAtrCfg, tslMaxDDCfg };
+  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', stepGuard: (req.query.stepGuard||'0') === '1', drawdownLevels, maxHold, timeAvgs: timeAvgsList, lookbackN, trailSLPct, tslAtrCfg, tslMaxDDCfg };
 
   if (!token || !clientId) {
     return res.status(400).json({ error: 'token and clientId required' });
@@ -4346,7 +4679,7 @@ app.get('/api/backtest/bhavcopy', async (req, res) => {
   const tslAtrCfg    = atrPeriod > 0 ? { period: atrPeriod, mult: parseFloat(req.query.tslAtrMult)||1.5, min: parseFloat(req.query.tslAtrMin)||3, max: parseFloat(req.query.tslAtrMax)||20 } : null;
   const ddMin        = parseFloat(req.query.tslDDMin) || 0;
   const tslMaxDDCfg  = ddMin > 0 ? { pct: Math.min(100, Math.max(1, parseFloat(req.query.tslDDPct)||100)), min: ddMin, max: parseFloat(req.query.tslDDMax)||40 } : null;
-  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', drawdownLevels, maxHold, timeAvgs: timeAvgsList, lookbackN, trailSLPct, tslAtrCfg, tslMaxDDCfg };
+  const simOpts = { maType, maPeriod: parseInt(maPeriod), w52filter, volFilter, rsiFilter, maxAverages, targetPcts, avgMode, avgFillGuard: avgFillGuard === '1', stepGuard: (req.query.stepGuard||'0') === '1', drawdownLevels, maxHold, timeAvgs: timeAvgsList, lookbackN, trailSLPct, tslAtrCfg, tslMaxDDCfg };
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -4542,6 +4875,106 @@ app.get('/api/portfolio/gtt', async (req, res) => {
   } catch (err) {
     res.json({ error: err.message });
   }
+});
+
+// ─────────────────────────────────────────────
+//  SIGNALS — Daily strategy scan (SSE stream)
+//  Scans NIFTY100 with 5-day lookback, computes
+//  N-day high/low, isAtLow, and maxDrawdownPct
+//  (full 1-year history for TSL calculation).
+// ─────────────────────────────────────────────
+app.get('/api/signals/scan', async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+  const send = obj => {
+    res.write('data: ' + JSON.stringify(obj) + '\n\n');
+    if (res.flush) res.flush();
+  };
+
+  const N      = 5;      // N-day lookback window (matches strategy default)
+  const TOLE   = 0.005;  // 0.5% tolerance for N-day low match
+  const stocks = [...new Set([...NIFTY50, ...NIFTY_NEXT50])]; // NIFTY100
+
+  send({ type: 'start', total: stocks.length });
+
+  for (let idx = 0; idx < stocks.length; idx++) {
+    const symbol = stocks[idx];
+    try {
+      const ticker = symbol + '.NS';
+      const now    = Math.floor(Date.now() / 1000);
+      const past   = now - 365 * 24 * 60 * 60; // 1 year → enough for max DD
+
+      const url  = 'https://query1.finance.yahoo.com/v8/finance/chart/'
+                 + encodeURIComponent(ticker)
+                 + '?period1=' + past + '&period2=' + now
+                 + '&interval=1d&includePrePost=false&corsDomain=finance.yahoo.com';
+
+      const yRes  = await fetch(url, { headers: YF_HEADERS });
+      if (!yRes.ok) throw new Error('Yahoo ' + yRes.status);
+      const yData = await yRes.json();
+      const chart = yData?.chart?.result?.[0];
+      if (!chart) throw new Error('No chart data');
+
+      const ts   = chart.timestamp || [];
+      const q    = chart.indicators?.quote?.[0] || {};
+      const meta = chart.meta || {};
+
+      // Build sorted daily bars
+      const history = ts.map((t, i) => ({
+        date:  new Date(t * 1000).toISOString().slice(0, 10),
+        open:  q.open?.[i],  high: q.high?.[i],
+        low:   q.low?.[i],   close: q.close?.[i],
+      })).filter(d => d.high != null && d.low != null)
+         .sort((a, b) => a.date.localeCompare(b.date));
+
+      if (history.length < N + 1) throw new Error('Insufficient data');
+
+      // N-day window = last N completed bars (exclude today if intraday)
+      const lastN = history.slice(-N);
+      const highN = Math.max(...lastN.map(d => d.high));
+      const lowN  = Math.min(...lastN.map(d => d.low));
+
+      // Live price fields from meta
+      const currentPrice = meta.regularMarketPrice ?? meta.chartPreviousClose ?? history[history.length - 1].close;
+      const todayLow     = meta.regularMarketDayLow ?? history[history.length - 1].low;
+      const prevClose    = history[history.length - 2]?.close;
+      const changePct    = prevClose ? (currentPrice - prevClose) / prevClose * 100 : 0;
+
+      // N-day low signal
+      const isAtLow = Math.abs(todayLow - lowN) / lowN <= TOLE;
+
+      // Max drawdown % — full 1-year history (peak-to-trough)
+      let peak = history[0].high;
+      let maxDD = 0;
+      for (const bar of history) {
+        if (bar.high > peak) peak = bar.high;
+        const dd = (peak - bar.low) / peak * 100;
+        if (dd > maxDD) maxDD = dd;
+      }
+
+      send({
+        type: 'progress', current: idx + 1, total: stocks.length, symbol,
+        data: {
+          symbol,
+          currentPrice: +currentPrice.toFixed(2),
+          changePct:    +changePct.toFixed(2),
+          highN:        +highN.toFixed(2),
+          lowN:         +lowN.toFixed(2),
+          dayLow:       +todayLow.toFixed(2),
+          isAtLow,
+          maxDrawdownPct: +maxDD.toFixed(2),
+        },
+      });
+    } catch (err) {
+      send({ type: 'progress', current: idx + 1, total: stocks.length, symbol, error: err.message });
+    }
+    await delay(300);
+  }
+
+  send({ type: 'complete' });
+  res.end();
 });
 
 // ─────────────────────────────────────────────
