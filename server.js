@@ -707,14 +707,20 @@ const HTML_PAGE = `<!DOCTYPE html>
     <div class="panel active" id="panel-scanner">
       <div class="section-header">
         <div>
-          <div class="section-title">20-Day Low Scanner</div>
-          <div class="section-subtitle">SCAN NSE STOCKS WHERE TODAY'S LOW = 20-DAY LOW</div>
+          <div class="section-title" id="scan-section-title">N-Day Low Scanner</div>
+          <div class="section-subtitle" id="scan-section-subtitle">SCAN NSE STOCKS WHERE TODAY'S LOW = N-DAY LOW</div>
         </div>
         <div class="scan-controls">
           <div class="index-selector" id="index-selector">
             <button class="idx-btn active" data-index="NIFTY50">NIFTY 50</button>
             <button class="idx-btn" data-index="NIFTYNEXT50">NIFTY NEXT 50</button>
             <button class="idx-btn" data-index="NIFTY100">NIFTY 100</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <label style="font-size:11px;color:var(--text2);font-family:var(--mono);white-space:nowrap;">N-Day Low:</label>
+            <input class="form-input" id="scan-n" type="number" value="20" min="5" max="100" step="1"
+              oninput="onScanNChange()"
+              style="width:58px;font-size:13px;font-weight:700;color:var(--cyan);text-align:right;padding:4px 6px;" />
           </div>
           <button class="btn btn-primary" id="scan-btn" onclick="startScan()">
             <span>▶</span> Start Scan
@@ -744,11 +750,11 @@ const HTML_PAGE = `<!DOCTYPE html>
         <div class="stat-card">
           <div class="stat-label">🔔 Alerts Found</div>
           <div class="stat-value gold" id="stat-alerts">0</div>
-          <div class="stat-sub">at 20-day low</div>
+          <div class="stat-sub" id="stat-alerts-sub">at N-day low</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">GTT Trigger</div>
-          <div class="stat-value" id="stat-gtt">Set 20D High</div>
+          <div class="stat-value" id="stat-gtt">Set ND High</div>
           <div class="stat-sub">as GTT price</div>
         </div>
         <div class="stat-card">
@@ -766,8 +772,8 @@ const HTML_PAGE = `<!DOCTYPE html>
               <th>Symbol / Name</th>
               <th class="num">Current ₹</th>
               <th class="num">Today Low</th>
-              <th class="num">20D Low</th>
-              <th class="num">20D High (GTT)</th>
+              <th class="num" id="scan-th-low">N-Day Low</th>
+              <th class="num" id="scan-th-high">N-Day High (GTT)</th>
               <th class="num">Chg %</th>
               <th>Status</th>
               <th class="actions">Action</th>
@@ -775,7 +781,7 @@ const HTML_PAGE = `<!DOCTYPE html>
           </thead>
           <tbody id="scan-tbody">
             <tr class="empty-row">
-              <td colspan="8">Select an index and click <strong>Start Scan</strong> to find stocks at 20-day low</td>
+              <td colspan="8">Select an index, set N-day lookback, and click <strong>Start Scan</strong></td>
             </tr>
           </tbody>
         </table>
@@ -2973,11 +2979,25 @@ document.querySelectorAll('.idx-btn').forEach(btn => {
 // ═══════════════════════════════════════════════════════
 //  SCANNER
 // ═══════════════════════════════════════════════════════
+function onScanNChange() {
+  const n = Math.max(5, Math.min(100, parseInt(document.getElementById('scan-n').value) || 20));
+  const lbl = n + '-Day';
+  const el = id => document.getElementById(id);
+  if (el('scan-section-title'))   el('scan-section-title').textContent   = lbl + ' Low Scanner';
+  if (el('scan-section-subtitle'))el('scan-section-subtitle').textContent= 'SCAN NSE STOCKS WHERE TODAY\'S LOW = ' + lbl + ' LOW';
+  if (el('stat-alerts-sub'))      el('stat-alerts-sub').textContent      = 'at ' + lbl.toLowerCase() + ' low';
+  if (el('stat-gtt'))             el('stat-gtt').textContent             = 'Set ' + n + 'D High';
+  if (el('scan-th-low'))          el('scan-th-low').textContent          = lbl + ' Low';
+  if (el('scan-th-high'))         el('scan-th-high').textContent         = lbl + ' High (GTT)';
+}
+
 function startScan() {
   if (state.scanning) return;
   state.scanning = true;
   state.scanResults = [];
 
+  const n = Math.max(5, Math.min(100, parseInt(document.getElementById('scan-n').value) || 20));
+  onScanNChange(); // refresh labels before scan starts
   const btn = document.getElementById('scan-btn');
   btn.innerHTML = '<span class="spinner"></span> Scanning...';
   btn.disabled = true;
@@ -2987,7 +3007,7 @@ function startScan() {
   document.getElementById('scan-stats').style.display = 'none';
   document.getElementById('scan-tbody').innerHTML = '';
 
-  const es = new EventSource(\`/api/scan/\${state.selectedIndex}\`);
+  const es = new EventSource(\`/api/scan/\${state.selectedIndex}?n=\${n}\`);
   let total = 0, current = 0, alerts = 0;
 
   es.onmessage = (e) => {
@@ -3008,7 +3028,7 @@ function startScan() {
 
       if (msg.data) {
         state.scanResults.push(msg.data);
-        if (msg.data.isAt20DayLow) {
+        if (msg.data.isAt20DayLow || msg.data.isAtNDayLow) {
           alerts++;
           document.getElementById('stat-alerts').textContent = alerts;
           appendScanRow(msg.data, true);
@@ -3033,7 +3053,7 @@ function startScan() {
 
       // Move alert rows to top
       reorderScanTable();
-      toast(\`Scan complete — \${msg.found} stocks at 20-day low\`, 'success');
+      toast(\`Scan complete — \${msg.found} stocks at \${n}-day low\`, 'success');
     }
   };
 
@@ -3537,12 +3557,13 @@ const YF_HEADERS = {
   'Origin': 'https://finance.yahoo.com',
 };
 
-async function get20DayData(symbol) {
+async function get20DayData(symbol, n = 20) {
   const ticker = symbol.includes('.') ? symbol : `${symbol}.NS`;
 
-  // 40 calendar days → guaranteed ≥20 trading days
+  // Fetch enough calendar days to guarantee n trading days (n*2 + 10 buffer)
+  const calDays = Math.max(40, n * 2 + 10);
   const now  = Math.floor(Date.now() / 1000);
-  const past = now - 40 * 24 * 60 * 60;
+  const past = now - calDays * 24 * 60 * 60;
 
   // v8/finance/chart — no auth needed, returns OHLCV + meta in one shot
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}` +
@@ -3578,13 +3599,16 @@ async function get20DayData(symbol) {
   // ── Meta / real-time fields from chart.meta ─
   const meta = result.meta || {};
 
-  // Most recent first, take last 20 trading days
+  // Most recent first, take last N trading days
   const sorted = [...history].sort((a, b) => b.date - a.date);
-  const last20 = sorted.slice(0, 20);
+  const lastN  = sorted.slice(0, n);
   const today  = sorted[0];
 
-  const high20 = Math.max(...last20.map(d => d.high));
-  const low20  = Math.min(...last20.map(d => d.low));
+  const highN  = Math.max(...lastN.map(d => d.high));
+  const lowN   = Math.min(...lastN.map(d => d.low));
+  // keep aliases for backward compatibility (watchlist & other callers)
+  const high20 = highN;
+  const low20  = lowN;
 
   // Current price: regularMarketPrice from meta, else last close
   const currentPrice = meta.regularMarketPrice ?? meta.chartPreviousClose ?? today.close;
@@ -3601,7 +3625,8 @@ async function get20DayData(symbol) {
   // We allow a tiny 0.05% buffer to account for Yahoo vs Google Finance
   // rounding differences — tight enough to avoid false positives like DIVISLAB
   // (0.135% away) while catching genuine exact-low matches like UPL (0.00%).
-  const isAt20DayLow = Math.abs(todayLow - low20) / low20 <= 0.0005;
+  const isAt20DayLow = Math.abs(todayLow - lowN) / lowN <= 0.0005;
+  const isAtNDayLow  = isAt20DayLow; // alias
 
   return {
     symbol,
@@ -3615,11 +3640,12 @@ async function get20DayData(symbol) {
     change,
     changePct,
     volume:       meta.regularMarketVolume  ?? today.volume,
-    high20,
-    low20,
+    high20, highN,
+    low20,  lowN,
     todayLow,
-    isAt20DayLow,
-    dataPoints:   last20.length,
+    isAt20DayLow, isAtNDayLow,
+    dataPoints:   lastN.length,
+    lookbackN: n,
     lastUpdated:  new Date().toISOString()
   };
 }
@@ -3658,7 +3684,8 @@ app.post('/api/stocks/batch', async (req, res) => {
 // SSE Scan — streams progress to client
 app.get('/api/scan/:index', async (req, res) => {
   const indexKey = req.params.index.toUpperCase();
-  const stocks = STOCK_UNIVERSE[indexKey] || NIFTY50;
+  const stocks   = STOCK_UNIVERSE[indexKey] || NIFTY50;
+  const scanN    = Math.max(5, Math.min(100, parseInt(req.query.n) || 20));
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -3677,7 +3704,7 @@ app.get('/api/scan/:index', async (req, res) => {
   for (let i = 0; i < stocks.length; i++) {
     const symbol = stocks[i];
     try {
-      const data = await get20DayData(symbol);
+      const data = await get20DayData(symbol, scanN);
       if (data.isAt20DayLow) alerts.push(data);
       send({ type: 'progress', current: i + 1, total: stocks.length, symbol, data });
     } catch (err) {
