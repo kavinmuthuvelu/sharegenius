@@ -5291,7 +5291,7 @@ app.get('/api/health', (req, res) => {
 
 // Serve inlined HTML
 app.get('/', (req, res) => res.send(HTML_PAGE));
-app.get('*', (req, res) => {
+app.use((req, res) => {
   if (!req.path.startsWith('/api')) res.send(HTML_PAGE);
   else res.status(404).json({ error: 'Not found' });
 });
