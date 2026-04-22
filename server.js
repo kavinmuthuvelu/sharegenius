@@ -1480,30 +1480,62 @@ const HTML_PAGE = `<!DOCTYPE html>
     <div class="panel" id="panel-portfolio">
       <div class="section-header">
         <div>
-          <div class="section-title">Portfolio — Dhan Live Data</div>
-          <div class="section-subtitle">Holdings · Open Positions · Forever (GTT) Orders</div>
+          <div class="section-title">Portfolio — Live Broker Data</div>
+          <div class="section-subtitle">Holdings · Open Positions · GTT Orders · Read-only</div>
         </div>
         <div class="section-actions">
-          <button class="btn btn-primary" onclick="loadPortfolio()" id="pf-refresh-btn">
-            ↺ Refresh
-          </button>
+          <button class="btn btn-primary" onclick="loadPortfolio()" id="pf-refresh-btn">↺ Refresh</button>
         </div>
       </div>
 
-      <!-- Credentials row -->
-      <div style="display:grid;grid-template-columns:1fr 2fr auto;gap:10px;margin-bottom:16px;align-items:end;">
-        <div class="stat-card" style="padding:10px 12px;">
-          <div class="stat-label">Dhan Client ID</div>
-          <input class="form-input" id="pf-client-id" placeholder="Your Client ID" style="margin-top:4px;font-size:12px;" />
-        </div>
-        <div class="stat-card" style="padding:10px 12px;">
-          <div class="stat-label">Access Token (refreshes daily)</div>
-          <input class="form-input" id="pf-token" type="password" placeholder="Paste token" style="margin-top:4px;font-size:12px;" />
-        </div>
-        <button class="btn btn-primary" style="height:38px;" onclick="loadPortfolio()">Load Data</button>
+      <!-- Broker selector -->
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <button class="idx-btn active" id="pf-broker-dhan" onclick="switchPfBroker('dhan')" style="font-size:12px;padding:6px 14px;">
+          🏦 Dhan
+        </button>
+        <button class="idx-btn" id="pf-broker-zerodha" onclick="switchPfBroker('zerodha')" style="font-size:12px;padding:6px 14px;">
+          🟢 Zerodha (Kite)
+        </button>
       </div>
-      <div class="form-hint" style="margin-bottom:16px;">
-        ℹ️ Token is used read-only — only Holdings, Positions, and GTT orders are fetched. No orders are placed.
+
+      <!-- Dhan credentials -->
+      <div id="pf-creds-dhan">
+        <div style="display:grid;grid-template-columns:1fr 2fr auto;gap:10px;margin-bottom:10px;align-items:end;">
+          <div class="stat-card" style="padding:10px 12px;">
+            <div class="stat-label">Dhan Client ID</div>
+            <input class="form-input" id="pf-client-id" placeholder="Your Client ID" style="margin-top:4px;font-size:12px;" />
+          </div>
+          <div class="stat-card" style="padding:10px 12px;">
+            <div class="stat-label">Access Token (refreshes daily)</div>
+            <input class="form-input" id="pf-token" type="password" placeholder="Paste access token" style="margin-top:4px;font-size:12px;" />
+          </div>
+          <button class="btn btn-primary" style="height:38px;" onclick="loadPortfolio()">Load</button>
+        </div>
+        <div class="form-hint" style="margin-bottom:14px;">
+          ℹ️ Get token from Dhan Web → Profile → DhanHQ Trading APIs. Refreshes every 24 hrs.
+        </div>
+      </div>
+
+      <!-- Zerodha credentials -->
+      <div id="pf-creds-zerodha" style="display:none;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 2fr auto;gap:10px;margin-bottom:10px;align-items:end;">
+          <div class="stat-card" style="padding:10px 12px;">
+            <div class="stat-label">Kite API Key</div>
+            <input class="form-input" id="pf-kite-apikey" placeholder="Your API Key" style="margin-top:4px;font-size:12px;" />
+          </div>
+          <div class="stat-card" style="padding:10px 12px;">
+            <div class="stat-label">User ID (optional)</div>
+            <input class="form-input" id="pf-kite-userid" placeholder="e.g. AB1234" style="margin-top:4px;font-size:12px;" />
+          </div>
+          <div class="stat-card" style="padding:10px 12px;">
+            <div class="stat-label">Access Token (refreshes daily)</div>
+            <input class="form-input" id="pf-kite-token" type="password" placeholder="Paste access token" style="margin-top:4px;font-size:12px;" />
+          </div>
+          <button class="btn btn-primary" style="height:38px;" onclick="loadPortfolio()">Load</button>
+        </div>
+        <div class="form-hint" style="margin-bottom:14px;">
+          ℹ️ Get token from <a href="https://kite.zerodha.com/connect/login?api_key=YOUR_API_KEY&v=3" target="_blank" style="color:var(--cyan)">Kite Connect login flow</a> or from kite.zerodha.com cookies (key: <code>enctoken</code>). Refreshes every 24 hrs. Read-only — no orders placed.
+        </div>
       </div>
 
       <!-- Error / status -->
@@ -1601,22 +1633,48 @@ const HTML_PAGE = `<!DOCTYPE html>
         </div>
       </div>
 
-      <!-- Credentials -->
-      <div style="display:grid;grid-template-columns:1fr 2fr auto;gap:10px;margin-bottom:12px;align-items:end;">
-        <div class="stat-card" style="padding:10px 12px;">
-          <div class="stat-label">Dhan Client ID</div>
-          <input class="form-input" id="sig-client-id" placeholder="Your Client ID" style="margin-top:4px;font-size:12px;" />
-        </div>
-        <div class="stat-card" style="padding:10px 12px;">
-          <div class="stat-label">Dhan Access Token</div>
-          <input class="form-input" id="sig-token" type="password" placeholder="Paste today's token" style="margin-top:4px;font-size:12px;" />
-        </div>
-        <div>
-          <button class="btn btn-primary" style="height:38px;" onclick="runSignals()">Run Now</button>
+      <!-- Broker selector for signals -->
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <button class="idx-btn active" id="sig-broker-dhan"    onclick="switchSigBroker('dhan')"    style="font-size:12px;padding:5px 12px;">🏦 Dhan</button>
+        <button class="idx-btn"        id="sig-broker-zerodha" onclick="switchSigBroker('zerodha')" style="font-size:12px;padding:5px 12px;">🟢 Zerodha</button>
+      </div>
+
+      <!-- Dhan credentials for signals -->
+      <div id="sig-creds-dhan">
+        <div style="display:grid;grid-template-columns:1fr 2fr auto;gap:10px;margin-bottom:10px;align-items:end;">
+          <div class="stat-card" style="padding:10px 12px;">
+            <div class="stat-label">Dhan Client ID</div>
+            <input class="form-input" id="sig-client-id" placeholder="Your Client ID" style="margin-top:4px;font-size:12px;" />
+          </div>
+          <div class="stat-card" style="padding:10px 12px;">
+            <div class="stat-label">Dhan Access Token</div>
+            <input class="form-input" id="sig-token" type="password" placeholder="Paste today's token" style="margin-top:4px;font-size:12px;" />
+          </div>
+          <div>
+            <button class="btn btn-primary" style="height:38px;" onclick="runSignals()">Run Now</button>
+          </div>
         </div>
       </div>
+
+      <!-- Zerodha credentials for signals -->
+      <div id="sig-creds-zerodha" style="display:none;">
+        <div style="display:grid;grid-template-columns:1fr 2fr auto;gap:10px;margin-bottom:10px;align-items:end;">
+          <div class="stat-card" style="padding:10px 12px;">
+            <div class="stat-label">Kite API Key</div>
+            <input class="form-input" id="sig-kite-apikey" placeholder="Your API Key" style="margin-top:4px;font-size:12px;" />
+          </div>
+          <div class="stat-card" style="padding:10px 12px;">
+            <div class="stat-label">Kite Access Token</div>
+            <input class="form-input" id="sig-kite-token" type="password" placeholder="Paste today's token" style="margin-top:4px;font-size:12px;" />
+          </div>
+          <div>
+            <button class="btn btn-primary" style="height:38px;" onclick="runSignals()">Run Now</button>
+          </div>
+        </div>
+      </div>
+
       <div class="form-hint" style="margin-bottom:16px;">
-        ℹ️ Scans NIFTY 100 (5-day lookback, N-Day high below entry, TSL = MaxDD × 75%) against live Yahoo Finance prices + your Dhan portfolio. Read-only — no orders placed.
+        ℹ️ Scans NIFTY 100 (5-day lookback, N-Day high below entry, TSL = MaxDD × 75%) against live Yahoo Finance prices + your broker portfolio. Read-only — no orders placed.
       </div>
 
       <!-- Progress -->
@@ -1888,10 +1946,45 @@ const SIG_TSL_MIN    = 5;     // min TSL %
 const SIG_TSL_MAX    = 100;   // max TSL %
 const SIG_TOLE       = 0.005; // 0.5% tolerance for N-day low match
 
+// ═══════════════════════════════════════════════════════
+//  DAILY SIGNALS
+// ═══════════════════════════════════════════════════════
+const SIG_N          = 5;     // lookback days
+const SIG_TARGET_PCT = 0.20;  // 20% target triggers TSL signal
+const SIG_TSL_DD     = 0.75;  // use 75% of max drawdown
+const SIG_TSL_MIN    = 5;     // min TSL %
+const SIG_TSL_MAX    = 100;   // max TSL %
+const SIG_TOLE       = 0.005; // 0.5% tolerance for N-day low match
+
+let sigBroker = 'dhan';
+
+function switchSigBroker(broker) {
+  sigBroker = broker;
+  document.getElementById('sig-creds-dhan').style.display    = broker === 'dhan'    ? '' : 'none';
+  document.getElementById('sig-creds-zerodha').style.display = broker === 'zerodha' ? '' : 'none';
+  document.querySelectorAll('#sig-broker-dhan, #sig-broker-zerodha')
+    .forEach(b => b.classList.remove('active'));
+  document.getElementById('sig-broker-' + broker).classList.add('active');
+}
+
 async function runSignals() {
-  const clientId = document.getElementById('sig-client-id').value.trim();
-  const token    = document.getElementById('sig-token').value.trim();
-  if (!token || !clientId) { toast('Enter Dhan Client ID and Access Token', 'error'); return; }
+  // Validate credentials and set up broker-specific fetch params
+  let hdrs, holdingsUrl, gttUrl;
+  if (sigBroker === 'dhan') {
+    const clientId = document.getElementById('sig-client-id').value.trim();
+    const token    = document.getElementById('sig-token').value.trim();
+    if (!token || !clientId) { toast('Enter Dhan Client ID and Access Token', 'error'); return; }
+    hdrs        = { 'x-dhan-token': token, 'x-dhan-client': clientId };
+    holdingsUrl = '/api/portfolio/holdings';
+    gttUrl      = '/api/portfolio/gtt';
+  } else {
+    const apiKey = document.getElementById('sig-kite-apikey').value.trim();
+    const token  = document.getElementById('sig-kite-token').value.trim();
+    if (!token || !apiKey) { toast('Enter Kite API Key and Access Token', 'error'); return; }
+    hdrs        = { 'x-kite-apikey': apiKey, 'x-kite-token': token };
+    holdingsUrl = '/api/zerodha/holdings';
+    gttUrl      = '/api/zerodha/gtt';
+  }
 
   document.getElementById('sig-empty').style.display       = 'none';
   document.getElementById('sig-results').style.display     = 'none';
@@ -1912,23 +2005,44 @@ async function runSignals() {
   };
 
   try {
-    // Step 1: Fetch Dhan portfolio
-    setP('Fetching Dhan portfolio…', 5);
-    const hdrs = { 'x-dhan-token': token, 'x-dhan-client': clientId };
+    // Step 1: Fetch broker portfolio
+    setP('Fetching ' + sigBroker + ' portfolio…', 5);
     const [hRes, gRes] = await Promise.all([
-      fetch('/api/portfolio/holdings', { headers: hdrs }),
-      fetch('/api/portfolio/gtt',      { headers: hdrs }),
+      fetch(holdingsUrl, { headers: hdrs }),
+      fetch(gttUrl,      { headers: hdrs }),
     ]);
-    const holdings  = await hRes.json();
-    const gttOrders = await gRes.json();
-    if (holdings.error) throw new Error('Holdings: ' + holdings.error);
+    const rawH = await hRes.json();
+    const rawG = await gRes.json();
+    if (rawH.error) throw new Error('Holdings: ' + rawH.error);
+
+    // Normalise to common {tradingsymbol, avgCostPrice, totalQty} format
+    let holdingsList, gttList;
+    if (sigBroker === 'dhan') {
+      holdingsList = (Array.isArray(rawH) ? rawH : []).map(h => ({
+        tradingsymbol: h.tradingSymbol || h.tradingsymbol,
+        avgCostPrice:  h.avgCostPrice  ?? 0,
+        totalQty:      h.totalQty      ?? 0,
+      }));
+      gttList = (Array.isArray(rawG) ? rawG : []).map(g => ({
+        tradingsymbol: g.tradingSymbol || g.tradingsymbol,
+        triggerPrice:  g.triggerPrice  ?? g.trigger_price ?? 0,
+      }));
+    } else {
+      holdingsList = (Array.isArray(rawH) ? rawH : []).map(h => ({
+        tradingsymbol: h.tradingsymbol,
+        avgCostPrice:  h.average_price ?? 0,
+        totalQty:      h.quantity      ?? 0,
+      }));
+      gttList = (Array.isArray(rawG) ? rawG : []).map(g => ({
+        tradingsymbol: g.condition?.tradingsymbol || '',
+        triggerPrice:  g.condition?.trigger_values?.[0] ?? 0,
+      }));
+    }
 
     const holdMap = {};
-    for (const h of (Array.isArray(holdings) ? holdings : []))
-      holdMap[h.tradingSymbol] = h;
+    for (const h of holdingsList) holdMap[h.tradingsymbol] = h;
     const gttMap = {};
-    for (const g of (Array.isArray(gttOrders) ? gttOrders : []))
-      if (g.tradingSymbol) gttMap[g.tradingSymbol] = g;
+    for (const g of gttList) if (g.tradingsymbol) gttMap[g.tradingsymbol] = g;
 
     // Step 2: Stream live scan from backend
     setP('Scanning NIFTY 100 via live data…', 10);
@@ -2057,13 +2171,22 @@ function renderSignals(s1, s2, s3, s4) {
 }
 
 // ═══════════════════════════════════════════════════════
-//  PORTFOLIO — Dhan live data (read-only)
+//  PORTFOLIO — Dhan + Zerodha (Kite) — read-only
 // ═══════════════════════════════════════════════════════
 
-function getPfCreds() {
-  const clientId = document.getElementById('pf-client-id').value.trim();
-  const token    = document.getElementById('pf-token').value.trim();
-  return { clientId, token };
+let pfBroker = 'dhan'; // 'dhan' | 'zerodha'
+
+function switchPfBroker(broker) {
+  pfBroker = broker;
+  document.getElementById('pf-creds-dhan').style.display    = broker === 'dhan'    ? '' : 'none';
+  document.getElementById('pf-creds-zerodha').style.display = broker === 'zerodha' ? '' : 'none';
+  document.querySelectorAll('#pf-broker-dhan, #pf-broker-zerodha')
+    .forEach(b => b.classList.remove('active'));
+  document.getElementById('pf-broker-' + broker).classList.add('active');
+  // Reset display
+  document.getElementById('pf-empty').style.display = 'block';
+  ['pf-stat-cards','pf-holdings-wrap','pf-positions-wrap','pf-gtt-wrap']
+    .forEach(id => document.getElementById(id).style.display = 'none');
 }
 
 function showPfError(msg) {
@@ -2071,46 +2194,103 @@ function showPfError(msg) {
   el.textContent = '⚠️ ' + msg;
   el.style.display = 'block';
 }
-
 function hidePfError() {
   document.getElementById('pf-error').style.display = 'none';
 }
 
 async function loadPortfolio() {
-  const { clientId, token } = getPfCreds();
-  if (!token || !clientId) return toast('Enter Dhan Client ID and Access Token', 'error');
-
   hidePfError();
-  document.getElementById('pf-empty').style.display     = 'none';
-  document.getElementById('pf-stat-cards').style.display = 'none';
-  document.getElementById('pf-holdings-wrap').style.display   = 'none';
-  document.getElementById('pf-positions-wrap').style.display  = 'none';
-  document.getElementById('pf-gtt-wrap').style.display        = 'none';
-
+  document.getElementById('pf-empty').style.display = 'none';
+  ['pf-stat-cards','pf-holdings-wrap','pf-positions-wrap','pf-gtt-wrap']
+    .forEach(id => document.getElementById(id).style.display = 'none');
   const btn = document.getElementById('pf-refresh-btn');
   btn.innerHTML = '<span class="spinner"></span> Loading...';
   btn.disabled  = true;
 
   try {
-    // Fetch all 3 endpoints via our backend proxy (avoids CORS)
-    const [holdingsRes, positionsRes, gttRes] = await Promise.all([
-      fetch('/api/portfolio/holdings',  { headers: { 'x-dhan-token': token, 'x-dhan-client': clientId } }),
-      fetch('/api/portfolio/positions', { headers: { 'x-dhan-token': token, 'x-dhan-client': clientId } }),
-      fetch('/api/portfolio/gtt',       { headers: { 'x-dhan-token': token, 'x-dhan-client': clientId } }),
-    ]);
+    let holdings, positions, gtt;
+    if (pfBroker === 'dhan') {
+      const clientId = document.getElementById('pf-client-id').value.trim();
+      const token    = document.getElementById('pf-token').value.trim();
+      if (!token || !clientId) throw new Error('Enter Dhan Client ID and Access Token');
+      const hdrs = { 'x-dhan-token': token, 'x-dhan-client': clientId };
+      const [hr, pr, gr] = await Promise.all([
+        fetch('/api/portfolio/holdings',  { headers: hdrs }),
+        fetch('/api/portfolio/positions', { headers: hdrs }),
+        fetch('/api/portfolio/gtt',       { headers: hdrs }),
+      ]);
+      const [h, p, g] = await Promise.all([hr.json(), pr.json(), gr.json()]);
+      if (h.error || p.error || g.error) throw new Error(h.error || p.error || g.error);
+      // Normalise Dhan → common format
+      holdings  = (Array.isArray(h) ? h : []).map(x => ({
+        tradingsymbol: x.tradingSymbol || x.tradingsymbol,
+        avgCostPrice:  x.avgCostPrice  ?? x.average_price ?? 0,
+        totalQty:      x.totalQty      ?? x.quantity ?? 0,
+        cmp:           x.cmp           ?? x.last_price ?? null,
+      }));
+      positions = (Array.isArray(p) ? p : []).map(x => ({
+        tradingsymbol:   x.tradingSymbol || x.tradingsymbol,
+        netQty:          x.netQty        ?? x.net_quantity ?? 0,
+        buyAvg:          x.buyAvg        ?? x.buy_price    ?? x.average_price ?? 0,
+        lastTradedPrice: x.lastTradedPrice ?? x.last_price ?? 0,
+        unrealizedProfit: x.unrealizedProfit ?? x.pnl ?? 0,
+        realizedProfit:   x.realizedProfit   ?? x.realised_quantity ?? 0,
+        positionType:    x.positionType ?? (x.net_quantity > 0 ? 'LONG' : 'SHORT'),
+      }));
+      gtt = (Array.isArray(g) ? g : []).map(x => ({
+        tradingsymbol:   x.tradingSymbol || x.tradingsymbol || x.securityId,
+        transactionType: x.transactionType || 'BUY',
+        quantity:        x.quantity,
+        triggerPrice:    x.triggerPrice ?? x.trigger_price ?? 0,
+        price:           x.price ?? x.triggerPrice ?? 0,
+        cmp:             x.cmp ?? null,
+        orderStatus:     x.orderStatus || x.status || 'PENDING',
+      }));
 
-    const [holdings, positions, gtt] = await Promise.all([
-      holdingsRes.json(), positionsRes.json(), gttRes.json(),
-    ]);
-
-    if (holdings.error || positions.error || gtt.error) {
-      throw new Error(holdings.error || positions.error || gtt.error);
+    } else {
+      // Zerodha (Kite Connect)
+      const apiKey = document.getElementById('pf-kite-apikey').value.trim();
+      const token  = document.getElementById('pf-kite-token').value.trim();
+      if (!token || !apiKey) throw new Error('Enter Kite API Key and Access Token');
+      const hdrs = { 'x-kite-apikey': apiKey, 'x-kite-token': token };
+      const [hr, pr, gr] = await Promise.all([
+        fetch('/api/zerodha/holdings',  { headers: hdrs }),
+        fetch('/api/zerodha/positions', { headers: hdrs }),
+        fetch('/api/zerodha/gtt',       { headers: hdrs }),
+      ]);
+      const [h, p, g] = await Promise.all([hr.json(), pr.json(), gr.json()]);
+      if (h.error || p.error || g.error) throw new Error(h.error || p.error || g.error);
+      // Normalise Kite → common format
+      holdings  = (Array.isArray(h) ? h : []).map(x => ({
+        tradingsymbol: x.tradingsymbol,
+        avgCostPrice:  x.average_price ?? 0,
+        totalQty:      x.quantity ?? 0,
+        cmp:           x.last_price ?? null,
+      }));
+      positions = ((p.net || p.day || []).concat(p.day || [])).map(x => ({
+        tradingsymbol:    x.tradingsymbol,
+        netQty:           x.net_quantity ?? x.quantity ?? 0,
+        buyAvg:           x.average_price ?? 0,
+        lastTradedPrice:  x.last_price ?? 0,
+        unrealizedProfit: x.pnl ?? x.unrealised ?? 0,
+        realizedProfit:   x.realised ?? 0,
+        positionType:     (x.net_quantity ?? 0) > 0 ? 'LONG' : 'SHORT',
+      }));
+      gtt = (Array.isArray(g) ? g : []).map(x => ({
+        tradingsymbol:   x.condition?.tradingsymbol || '',
+        transactionType: x.orders?.[0]?.transaction_type || 'BUY',
+        quantity:        x.orders?.[0]?.quantity ?? 0,
+        triggerPrice:    x.condition?.trigger_values?.[0] ?? 0,
+        price:           x.orders?.[0]?.price ?? 0,
+        cmp:             x.condition?.last_price ?? null,
+        orderStatus:     x.status || 'active',
+      }));
     }
 
     renderPortfolio(holdings, positions, gtt);
-    toast('Portfolio loaded', 'success');
+    toast('Portfolio loaded (' + pfBroker + ')', 'success');
   } catch (err) {
-    showPfError(err.message || 'Failed to load portfolio. Check token and try again.');
+    showPfError(err.message || 'Failed to load portfolio. Check credentials and try again.');
     document.getElementById('pf-empty').style.display = 'block';
   } finally {
     btn.innerHTML = '↺ Refresh';
@@ -5035,6 +5215,71 @@ app.get('/api/signals/scan', async (req, res) => {
 
   send({ type: 'complete' });
   res.end();
+});
+
+
+// ─────────────────────────────────────────────────────────
+//  ZERODHA (KITE CONNECT) — portfolio proxy routes (read-only)
+//  Kite API base: https://api.kite.trade
+//  Auth: Authorization: token api_key:access_token
+//  All are GET, no orders placed.
+// ─────────────────────────────────────────────────────────
+
+async function kiteGet(path, apiKey, accessToken) {
+  const authHeader = `token ${apiKey}:${accessToken}`;
+  const res = await fetch(`https://api.kite.trade${path}`, {
+    headers: {
+      'X-Kite-Version': '3',
+      'Authorization': authHeader,
+    },
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => res.statusText);
+    throw new Error(`Kite ${res.status}: ${txt.slice(0, 200)}`);
+  }
+  const json = await res.json();
+  if (json.status === 'error') throw new Error(json.message || 'Kite API error');
+  return json.data;
+}
+
+// GET /api/zerodha/holdings
+app.get('/api/zerodha/holdings', async (req, res) => {
+  const apiKey = req.headers['x-kite-apikey'];
+  const token  = req.headers['x-kite-token'];
+  if (!apiKey || !token) return res.status(400).json({ error: 'Missing Kite credentials' });
+  try {
+    const data = await kiteGet('/portfolio/holdings', apiKey, token);
+    res.json(Array.isArray(data) ? data : []);
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+
+// GET /api/zerodha/positions
+app.get('/api/zerodha/positions', async (req, res) => {
+  const apiKey = req.headers['x-kite-apikey'];
+  const token  = req.headers['x-kite-token'];
+  if (!apiKey || !token) return res.status(400).json({ error: 'Missing Kite credentials' });
+  try {
+    const data = await kiteGet('/portfolio/positions', apiKey, token);
+    // Kite returns { net: [...], day: [...] }
+    res.json(data || { net: [], day: [] });
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+
+// GET /api/zerodha/gtt
+app.get('/api/zerodha/gtt', async (req, res) => {
+  const apiKey = req.headers['x-kite-apikey'];
+  const token  = req.headers['x-kite-token'];
+  if (!apiKey || !token) return res.status(400).json({ error: 'Missing Kite credentials' });
+  try {
+    const data = await kiteGet('/gtt/triggers', apiKey, token);
+    res.json(Array.isArray(data) ? data : []);
+  } catch (err) {
+    res.json({ error: err.message });
+  }
 });
 
 // ─────────────────────────────────────────────
