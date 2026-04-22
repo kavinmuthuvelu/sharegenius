@@ -1,20 +1,13 @@
 {
   "name": "sharegenius-swing-trader",
   "version": "1.0.0",
-  "description": "Sharegenius Swing Trading Strategy App - 20-Day High/Low GTT System",
+  "description": "Sharegenius swing trading backtest and signal app",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "start": "node server.js"
   },
   "dependencies": {
-  "express": "^4.21.2",
-  "adm-zip": "^0.5.16"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.2"
+    "adm-zip": "^0.5.17",
+    "express": "^4.21.2"
   }
 }
