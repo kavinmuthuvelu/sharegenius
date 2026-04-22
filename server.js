@@ -1946,16 +1946,6 @@ const SIG_TSL_MIN    = 5;     // min TSL %
 const SIG_TSL_MAX    = 100;   // max TSL %
 const SIG_TOLE       = 0.005; // 0.5% tolerance for N-day low match
 
-// ═══════════════════════════════════════════════════════
-//  DAILY SIGNALS
-// ═══════════════════════════════════════════════════════
-const SIG_N          = 5;     // lookback days
-const SIG_TARGET_PCT = 0.20;  // 20% target triggers TSL signal
-const SIG_TSL_DD     = 0.75;  // use 75% of max drawdown
-const SIG_TSL_MIN    = 5;     // min TSL %
-const SIG_TSL_MAX    = 100;   // max TSL %
-const SIG_TOLE       = 0.005; // 0.5% tolerance for N-day low match
-
 let sigBroker = 'dhan';
 
 function switchSigBroker(broker) {
@@ -3164,7 +3154,7 @@ function onScanNChange() {
   const lbl = n + '-Day';
   const el = id => document.getElementById(id);
   if (el('scan-section-title'))   el('scan-section-title').textContent   = lbl + ' Low Scanner';
-  if (el('scan-section-subtitle'))el('scan-section-subtitle').textContent= 'SCAN NSE STOCKS WHERE TODAY\'S LOW = ' + lbl + ' LOW';
+  if (el('scan-section-subtitle'))el('scan-section-subtitle').textContent= "SCAN NSE STOCKS WHERE TODAY'S LOW = " + lbl + " LOW";
   if (el('stat-alerts-sub'))      el('stat-alerts-sub').textContent      = 'at ' + lbl.toLowerCase() + ' low';
   if (el('stat-gtt'))             el('stat-gtt').textContent             = 'Set ' + n + 'D High';
   if (el('scan-th-low'))          el('scan-th-low').textContent          = lbl + ' Low';
