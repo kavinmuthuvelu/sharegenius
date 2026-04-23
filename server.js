@@ -1,13 +1,66 @@
 const express = require('express');
-const fs = require('fs').promises;
+const fs      = require('fs').promises;
+const crypto  = require('crypto');
 
-const app = express();
+const app  = express();
 const PORT = process.env.PORT || 3000;
 
 // On Render, use /tmp for ephemeral storage
 const DATA_FILE = process.env.DATA_FILE || '/tmp/sharegenius-data.json';
 
+// ── Auth config ──────────────────────────────────────────────────────────────
+// Override via env vars: AUTH_USER and AUTH_PASS on Render dashboard
+const AUTH_USER  = process.env.AUTH_USER  || 'Kavin';
+const AUTH_PASS  = process.env.AUTH_PASS  || 'Cortex1234$';
+const COOKIE_NAME = 'sg_sess';
+// In-memory session store: token → expiry timestamp
+const sessions = new Map();
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+
+function createSession() {
+  const token   = crypto.randomBytes(32).toString('hex');
+  const expires = Date.now() + SESSION_TTL_MS;
+  sessions.set(token, expires);
+  return { token, expires };
+}
+
+function isValidSession(token) {
+  if (!token || !sessions.has(token)) return false;
+  if (Date.now() > sessions.get(token)) { sessions.delete(token); return false; }
+  return true;
+}
+
+// Purge expired sessions every hour
+setInterval(() => {
+  const now = Date.now();
+  for (const [t, exp] of sessions) if (now > exp) sessions.delete(t);
+}, 60 * 60 * 1000);
+
+// ── Parse cookies helper ─────────────────────────────────────────────────────
+function parseCookies(req) {
+  const out = {};
+  const header = req.headers.cookie || '';
+  header.split(';').forEach(pair => {
+    const [k, ...v] = pair.trim().split('=');
+    if (k) out[k.trim()] = decodeURIComponent(v.join('='));
+  });
+  return out;
+}
+
+// ── Auth middleware ──────────────────────────────────────────────────────────
+function requireAuth(req, res, next) {
+  // Allow login page and login API without auth
+  if (req.path === '/login' || req.path === '/api/login') return next();
+  const token = parseCookies(req)[COOKIE_NAME];
+  if (isValidSession(token)) return next();
+  // API calls → 401 JSON; page requests → redirect to login
+  if (req.path.startsWith('/api')) return res.status(401).json({ error: 'Unauthorized' });
+  return res.redirect('/login');
+}
+
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+app.use(requireAuth);
 // HTML inlined — no public/ folder needed
 const HTML_PAGE = `<!DOCTYPE html>
 <html lang="en">
@@ -698,6 +751,12 @@ const HTML_PAGE = `<!DOCTYPE html>
       <span class="tab-icon">🎯</span> Daily Signals
       <span class="tab-badge" id="badge-signals" style="background:var(--red);">0</span>
     </button>
+    <form method="POST" action="/api/logout" style="margin-left:auto;">
+      <button class="tab-btn" type="submit"
+        style="color:var(--text3);font-size:11px;padding:6px 12px;border:1px solid var(--border);border-radius:var(--radius);">
+        ⎋ Logout
+      </button>
+    </form>
   </nav>
 
   <!-- ═══════ MAIN CONTENT ══════════════════════════════ -->
@@ -5270,6 +5329,99 @@ app.get('/api/zerodha/gtt', async (req, res) => {
   } catch (err) {
     res.json({ error: err.message });
   }
+});
+
+
+// ─────────────────────────────────────────────
+//  AUTH ROUTES
+// ─────────────────────────────────────────────
+
+const LOGIN_PAGE = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Sharegenius — Login</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+         background:#0d0f14;display:flex;align-items:center;justify-content:center;
+         min-height:100vh;padding:20px}
+    .card{background:#161b22;border:1px solid #30363d;border-radius:12px;
+          padding:40px;width:100%;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,0.5)}
+    .logo{text-align:center;margin-bottom:28px}
+    .logo-icon{font-size:40px;margin-bottom:8px}
+    .logo h1{font-size:22px;font-weight:700;color:#e6edf3;letter-spacing:-0.5px}
+    .logo p{font-size:12px;color:#8b949e;margin-top:4px;font-family:monospace}
+    label{display:block;font-size:12px;color:#8b949e;margin-bottom:6px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase}
+    input{width:100%;padding:10px 12px;background:#0d1117;border:1px solid #30363d;
+          border-radius:6px;color:#e6edf3;font-size:14px;margin-bottom:16px;outline:none;
+          transition:border 0.2s}
+    input:focus{border-color:#1f6feb}
+    .btn{width:100%;padding:11px;background:#1f6feb;color:#fff;border:none;
+         border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;
+         transition:background 0.2s;letter-spacing:0.3px}
+    .btn:hover{background:#388bfd}
+    .btn:active{background:#1158c7}
+    .error{background:rgba(248,81,73,0.15);border:1px solid rgba(248,81,73,0.4);
+           border-radius:6px;padding:10px 12px;color:#f85149;font-size:13px;
+           margin-bottom:16px;display:none}
+    .error.show{display:block}
+    .footer{text-align:center;margin-top:20px;font-size:11px;color:#484f58;font-family:monospace}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <div class="logo-icon">📈</div>
+      <h1>Sharegenius</h1>
+      <p>Swing Trader · Strategy Dashboard</p>
+    </div>
+    <div class="error" id="err">Invalid username or password</div>
+    <form method="POST" action="/api/login" id="loginForm">
+      <label>Username</label>
+      <input type="text" name="username" autocomplete="username" autofocus required/>
+      <label>Password</label>
+      <input type="password" name="password" autocomplete="current-password" required/>
+      <button class="btn" type="submit">Sign In</button>
+    </form>
+    <div class="footer">Sharegenius Swing Trader · Read-only portfolio · No orders placed</div>
+  </div>
+  <script>
+    // Show error if redirected back with ?err=1
+    if (location.search.includes('err=1'))
+      document.getElementById('err').classList.add('show');
+  </script>
+</body>
+</html>`;
+
+// GET /login — serve login page
+app.get('/login', (req, res) => {
+  const token = parseCookies(req)[COOKIE_NAME];
+  if (isValidSession(token)) return res.redirect('/');
+  res.setHeader('Content-Type', 'text/html');
+  res.send(LOGIN_PAGE);
+});
+
+// POST /api/login — validate credentials, set cookie
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body;
+  if (username === AUTH_USER && password === AUTH_PASS) {
+    const { token, expires } = createSession();
+    res.setHeader('Set-Cookie',
+      `${COOKIE_NAME}=${token}; HttpOnly; SameSite=Strict; Path=/; Expires=${new Date(expires).toUTCString()}`
+    );
+    return res.redirect('/');
+  }
+  return res.redirect('/login?err=1');
+});
+
+// POST /api/logout — clear cookie
+app.post('/api/logout', (req, res) => {
+  const token = parseCookies(req)[COOKIE_NAME];
+  if (token) sessions.delete(token);
+  res.setHeader('Set-Cookie', `${COOKIE_NAME}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`);
+  res.redirect('/login');
 });
 
 // ─────────────────────────────────────────────
